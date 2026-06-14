@@ -1,0 +1,26 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "intel-mpi",
+      "displayName": "Intel MPI (mpiifx) + Parallel HDF5",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_Fortran_COMPILER": "mpiifx",
+        "H5FORTRAN_PHDF5_ROOT": "$env{HOME}/.local/opt/intel/phdf5"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "intel-mpi",
+      "configurePreset": "intel-mpi"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "intel-mpi",
+      "configurePreset": "intel-mpi"
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+#define H5FORT_SERIAL
+#define H5FORT_PARALLEL
