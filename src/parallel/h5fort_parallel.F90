@@ -2,6 +2,7 @@ module h5fort_parallel
   use h5fort_parallel_write
   use h5fort_parallel_read
   use h5fort_parallel_read_fixed
+  use h5fort_parallel_hdf5_xdmf
   implicit none
   private
 

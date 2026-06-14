@@ -19,6 +19,7 @@ add_library(h5fortran_parallel
   parallel/h5fort_parallel_write.F90
   parallel/h5fort_parallel_read.F90
   parallel/h5fort_parallel_read_fixed.F90
+  parallel/h5fort_parallel_hdf5_xdmf.F90
   parallel/h5fort_parallel.F90)
 
 target_link_libraries(h5fortran_parallel PUBLIC h5fortran_hdf5)

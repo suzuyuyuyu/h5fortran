@@ -2,7 +2,7 @@
 ! Tohoku University, Keiriki
 !------------------------------------------------------------------------------
 !
-! MODULE: phdf5_writer
+! MODULE: h5fort_parallel_hdf5_xdmf
 !
 !> @author
 !> Yuta Suzuki
@@ -107,7 +107,7 @@
 !
 !------------------------------------------------------------------------------
 
-module phdf5_writer
+module h5fort_parallel_hdf5_xdmf
   use hdf5
 ! # define USE_MPI_F08
 # ifdef USE_MPI_F08
@@ -853,4 +853,4 @@ contains
     write(u,'(a)') '</Attribute>'
   end subroutine write_global_attribute_
 
-end module phdf5_writer
+end module h5fort_parallel_hdf5_xdmf
