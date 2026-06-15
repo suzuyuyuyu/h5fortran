@@ -1,3 +1,4 @@
+#include "h5fort_config.inc"
 #include "h5fort_parallel.inc"
 module h5fort_parallel_write
   use hdf5
@@ -11,6 +12,9 @@ module h5fort_parallel_write
   public :: h5fort_write_i32_0d, h5fort_write_i32_1d, h5fort_write_i32_2d, h5fort_write_i32_3d, h5fort_write_i32_4d
   public :: h5fort_write_str_0d
   public :: h5fort_write_lgc_0d, h5fort_write_lgc_1d, h5fort_write_lgc_2d, h5fort_write_lgc_3d, h5fort_write_lgc_4d
+
+  character(len=*), parameter :: COUNT_DATASET_NAME = H5FORT_DSET_COUNT_DNAME
+  character(len=*), parameter :: OFFSET_DATASET_NAME = H5FORT_DSET_OFFSET_DNAME
 
 contains
 
@@ -83,9 +87,9 @@ contains
     integer(int64), intent(in) :: count_(0:), offset_(0:)
     integer, intent(out) :: hdferr
 
-    call write_i64_partition_dataset(group_id, "count", count_, xfer_id, hdferr)
+    call write_i64_partition_dataset(group_id, trim(COUNT_DATASET_NAME), count_, xfer_id, hdferr)
     if (hdferr /= 0) return
-    call write_i64_partition_dataset(group_id, "offset", offset_, xfer_id, hdferr)
+    call write_i64_partition_dataset(group_id, trim(OFFSET_DATASET_NAME), offset_, xfer_id, hdferr)
   end subroutine write_partition
 
   subroutine write_i64_partition_dataset(group_id, dname, array, xfer_id, hdferr)

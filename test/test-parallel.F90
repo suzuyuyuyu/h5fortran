@@ -27,6 +27,7 @@ program test_parallel
   coord = coord_all(:, oc + 1:oc + nc)
 
   call h5open_f(hdferr); call check(hdferr)
+
   call open_file("test-parallel.h5", H5F_ACC_TRUNC_F, file_id, hdferr); call check(hdferr)
   call h5fort_pwrite(file_id, "/value", value, hdferr); call check(hdferr)
   call h5fort_pwrite(file_id, "/coord", coord, hdferr); call check(hdferr)
@@ -42,6 +43,26 @@ program test_parallel
   call assert(all(abs(coord_read - coord) < 1.0e-12_real64))
   call assert(all(abs(coord_fixed - coord) < 1.0e-12_real64))
   call h5fclose_f(file_id, hdferr); call check(hdferr)
+
+  block
+    type(t_h5fort_parallel) :: h5fp
+    call open_file("test-parallel-class.h5", H5F_ACC_TRUNC_F, file_id, hdferr); call check(hdferr)
+    call h5fp%write(file_id, "/value", value, hdferr); call check(hdferr)
+    call h5fp%write(file_id, "/coord", coord, hdferr); call check(hdferr)
+    call h5fclose_f(file_id, hdferr); call check(hdferr)
+
+    call open_file("test-parallel-class.h5", H5F_ACC_RDONLY_F, file_id, hdferr); call check(hdferr)
+    call h5fp%read(file_id, "/value", value_read, hdferr); call check(hdferr)
+    call h5fp%read_fixed(file_id, "/value", value_fixed, hdferr); call check(hdferr)
+    call h5fp%read(file_id, "/coord", coord_read, hdferr); call check(hdferr)
+    call h5fp%read_fixed(file_id, "/coord", coord_fixed, hdferr); call check(hdferr)
+    call assert(all(abs(value_read - value) < 1.0e-12_real64))
+    call assert(all(abs(value_fixed - value) < 1.0e-12_real64))
+    call assert(all(abs(coord_read - coord) < 1.0e-12_real64))
+    call assert(all(abs(coord_fixed - coord) < 1.0e-12_real64))
+    call h5fclose_f(file_id, hdferr); call check(hdferr)
+  end block
+
   call h5close_f(hdferr); call check(hdferr)
 
   call MPI_Finalize(ierr)

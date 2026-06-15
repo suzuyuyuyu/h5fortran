@@ -12,6 +12,8 @@ module h5fort_parallel
 
   public :: t_h5fort_parallel
 
+  public :: t_phdf5_writer
+
   interface h5fort_pwrite
     module procedure h5fort_write_r64_0d, h5fort_write_r64_1d, h5fort_write_r64_2d, h5fort_write_r64_3d, h5fort_write_r64_4d
     module procedure h5fort_write_r32_0d, h5fort_write_r32_1d, h5fort_write_r32_2d, h5fort_write_r32_3d, h5fort_write_r32_4d

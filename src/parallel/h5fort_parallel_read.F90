@@ -1,3 +1,4 @@
+#include "h5fort_config.inc"
 #include "h5fort_parallel.inc"
 module h5fort_parallel_read
   use hdf5
@@ -11,6 +12,9 @@ module h5fort_parallel_read
   public :: h5fort_read_i32_0d, h5fort_read_i32_1d, h5fort_read_i32_2d, h5fort_read_i32_3d, h5fort_read_i32_4d
   public :: h5fort_read_str_0d
   public :: h5fort_read_lgc_0d, h5fort_read_lgc_1d, h5fort_read_lgc_2d, h5fort_read_lgc_3d, h5fort_read_lgc_4d
+
+  character(len=*), parameter :: COUNT_DATASET_NAME = H5FORT_DSET_COUNT_DNAME
+  character(len=*), parameter :: OFFSET_DATASET_NAME = H5FORT_DSET_OFFSET_DNAME
 
 contains
 
@@ -37,9 +41,9 @@ contains
     end if
 
     allocate(count_(0:nprocs - 1), offset_(0:nprocs - 1))
-    call read_i64_vector(file_id, trim(dset_path)//"/count", count_, hdferr)
+    call read_i64_vector(file_id, trim(dset_path)//"/"//trim(COUNT_DATASET_NAME), count_, hdferr)
     if (hdferr /= 0) return
-    call read_i64_vector(file_id, trim(dset_path)//"/offset", offset_, hdferr)
+    call read_i64_vector(file_id, trim(dset_path)//"/"//trim(OFFSET_DATASET_NAME), offset_, hdferr)
     if (hdferr /= 0) return
 
     nlocal = count_(me)

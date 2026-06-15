@@ -18,6 +18,7 @@ module h5fort
 # if defined(H5FORT_PARALLEL)
   public :: h5fort_pwrite, h5fort_pread, h5fort_pread_fixed
   public :: t_h5fort_parallel
+  public :: t_phdf5_writer
 # endif
 
 # if defined(H5FORT_SERIAL)
