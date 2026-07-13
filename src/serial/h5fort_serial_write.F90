@@ -1,7 +1,9 @@
+! DO NOT EDIT — generated from src/fypp/serial/h5fort_serial_write.fypp
+! To regenerate: scripts/generate_fypp.sh
 #include "h5fort_serial.inc"
 module h5fort_serial_write
   use hdf5
-  use iso_fortran_env
+  use,intrinsic :: iso_fortran_env
   implicit none
   private
 
@@ -9,14 +11,28 @@ module h5fort_serial_write
   public :: h5fort_swrite_attr
   public :: H5FORTRAN_FORCE_WRITE
 
-  public :: h5fort_write_r64_0d, h5fort_write_r64_1d, h5fort_write_r64_2d, h5fort_write_r64_3d, h5fort_write_r64_4d
-  public :: h5fort_write_r32_0d, h5fort_write_r32_1d, h5fort_write_r32_2d, h5fort_write_r32_3d, h5fort_write_r32_4d
-  public :: h5fort_write_i32_0d, h5fort_write_i32_1d, h5fort_write_i32_2d, h5fort_write_i32_3d, h5fort_write_i32_4d
+  public :: h5fort_write_r64_0d
+  public :: h5fort_write_r64_1d
+  public :: h5fort_write_r64_2d
+  public :: h5fort_write_r64_3d
+  public :: h5fort_write_r64_4d
+  public :: h5fort_write_r32_0d
+  public :: h5fort_write_r32_1d
+  public :: h5fort_write_r32_2d
+  public :: h5fort_write_r32_3d
+  public :: h5fort_write_r32_4d
+  public :: h5fort_write_i32_0d
+  public :: h5fort_write_i32_1d
+  public :: h5fort_write_i32_2d
+  public :: h5fort_write_i32_3d
+  public :: h5fort_write_i32_4d
   public :: h5fort_write_str_0d
-  public :: h5fort_write_lgc_0d, h5fort_write_lgc_1d, h5fort_write_lgc_2d, h5fort_write_lgc_3d, h5fort_write_lgc_4d
+  public :: h5fort_write_lgc_0d
+  public :: h5fort_write_lgc_1d
+  public :: h5fort_write_lgc_2d
+  public :: h5fort_write_lgc_3d
+  public :: h5fort_write_lgc_4d
 
-
-  ! Name/Value pair for attributes
   integer, parameter :: ATTR_NAME_LEN  = 64
   integer, parameter :: ATTR_VALUE_LEN = 256
 
@@ -25,21 +41,12 @@ module h5fort_serial_write
     character(len=ATTR_VALUE_LEN) :: value = ""
   end type t_hdf5_attr
 
-  ! private parameter
   integer, parameter :: H5FORTRAN_FORCE_WRITE = 1
 
 contains
 
   !============================================================================
   ! 内部ユーティリティ: データセットの形状を取得する
-  !
-  ! 引数:
-  !   file_id  [in]  : h5fopen_f/h5fcreate_f で得たファイルID
-  !   dset_path[in]  : データセットの絶対パス（例: "/group/dataset"）
-  !   dset_id  [out] : 開かれたデータセットID（呼び出し元でcloseすること）
-  !   rank     [out] : 配列のランク（次元数）
-  !   dims     [out] : 各次元のサイズ（長さ rank の配列）
-  !   hdferr   [out] : エラーコード（0=正常）
   !============================================================================
   subroutine get_dataset_info(file_id, dset_path, dset_id, rank, dims, hdferr)
     integer(hid_t),   intent(in)  :: file_id
@@ -56,41 +63,37 @@ contains
     dims    = 1_hsize_t
     hdferr  = 0
 
-    ! データセットを開く
     call h5dopen_f(file_id, trim(dset_path), dset_id, err_local)
     if (err_local /= 0) then
-      write(*,'(A,A)') "[h5fort_serial_write] ERROR: h5dopen_f failed for: ", &
+      write(error_unit,'(A,A)') "[h5fort_serial_write] ERROR: h5dopen_f failed for: ", &
                        trim(dset_path)
       hdferr = err_local; return
     end if
 
-    ! dataspaceを取得
     call h5dget_space_f(dset_id, space_id, err_local)
     if (err_local /= 0) then
-      write(*,'(A)') "[h5fort_serial_write] ERROR: h5dget_space_f failed."
+      write(error_unit,'(A)') "[h5fort_serial_write] ERROR: h5dget_space_f failed."
       hdferr = err_local; return
     end if
 
-    ! ランクを取得
     call h5sget_simple_extent_ndims_f(space_id, rank, err_local)
     if (err_local /= 0) then
-      write(*,'(A)') "[h5fort_serial_write] ERROR: h5sget_simple_extent_ndims_f failed."
+      write(error_unit,'(A)') "[h5fort_serial_write] ERROR: h5sget_simple_extent_ndims_f failed."
       hdferr = err_local
       call h5sclose_f(space_id, err_local)
       return
     end if
 
     if (rank > MAX_RANK) then
-      write(*,'(A,I0)') "[h5fort_serial_write] ERROR: rank exceeds MAX_RANK. rank = ", rank
+      write(error_unit,'(A,I0)') "[h5fort_serial_write] ERROR: rank exceeds MAX_RANK. rank = ", rank
       hdferr = -1
       call h5sclose_f(space_id, err_local)
       return
     end if
 
-    ! 各次元サイズを取得
     call h5sget_simple_extent_dims_f(space_id, dims(1:rank), maxdims(1:rank), err_local)
     if (err_local < 0) then
-      write(*,'(A)') "[h5fort_serial_write] ERROR: h5sget_simple_extent_dims_f failed."
+      write(error_unit,'(A)') "[h5fort_serial_write] ERROR: h5sget_simple_extent_dims_f failed."
       hdferr = err_local
     end if
 
@@ -113,16 +116,6 @@ contains
 
   !============================================================================
   ! h5fort_swrite_attr: データセット/グループに文字列 attribute を付与する
-  !
-  ! 引数:
-  !   file_id  [in]  : h5fopen_f/h5fcreate_f で得たファイルID
-  !   obj_path [in]  : 対象データセットまたはグループの絶対パス
-  !   attrs    [in]  : t_hdf5_attr の配列 (Name/Value ペアのリスト)
-  !   hdferr   [out] : エラーコード（0=正常）
-  !
-  ! 注記:
-  !   同名の attribute が存在する場合は上書きする。
-  !   attrs(i)%name が空文字列のエントリはスキップする。
   !============================================================================
   subroutine h5fort_swrite_attr(file_id, obj_path, attrs, hdferr)
     integer(hid_t),    intent(in)  :: file_id
@@ -141,7 +134,7 @@ contains
 
     call h5oopen_f(file_id, trim(obj_path), obj_id, hdferr)
     if (hdferr /= 0) then
-      write(*,'(A,A)') "[h5fort_serial_write] ERROR: h5oopen_f failed for: ", trim(obj_path)
+      write(error_unit,'(A,A)') "[h5fort_serial_write] ERROR: h5oopen_f failed for: ", trim(obj_path)
       return
     end if
 
@@ -159,7 +152,7 @@ contains
 
       call h5acreate_f(obj_id, trim(attrs(i)%name), str_type_id, space_id, attr_id, err_local)
       if (err_local /= 0) then
-        write(*,'(A,A)') "[h5fort_serial_write] ERROR: h5acreate_f failed for attr: ", &
+        write(error_unit,'(A,A)') "[h5fort_serial_write] ERROR: h5acreate_f failed for attr: ", &
                           trim(attrs(i)%name)
         if (hdferr == 0) hdferr = err_local
       else
@@ -177,9 +170,6 @@ contains
 
   !============================================================================
   ! 内部ユーティリティ: 中間グループ自動生成付きでデータセットを作成する
-  !
-  ! h5dcreate_f 後に dspace_id / lcpl_id は不要になるため内部でクローズする。
-  ! 呼び出し元は dset_id に対して h5dwrite_f → h5dclose_f を行う。
   !============================================================================
   subroutine create_dataset(file_id, dset_path, h5type, rank, dims, dset_id, hdferr, mode)
     integer(hid_t),   intent(in)  :: file_id
@@ -214,14 +204,13 @@ contains
     call h5dcreate_f(file_id, trim(dset_path), h5type, dspace_id, dset_id, err_local, &
                      lcpl_id=lcpl_id)
     if (err_local /= 0) then
-      write(*,'(A,A)') "[h5fort_serial_write] ERROR: h5dcreate_f failed for: ", trim(dset_path)
+      write(error_unit,'(A,A)') "[h5fort_serial_write] ERROR: h5dcreate_f failed for: ", trim(dset_path)
       hdferr = err_local
     end if
 
     call h5sclose_f(dspace_id, err_local)
     call h5pclose_f(lcpl_id, err_local)
   end subroutine create_dataset
-
 
   !============================================================================
   ! 内部ユーティリティ: スカラーデータセットを作成する（H5S_SCALAR_F使用）
@@ -257,7 +246,7 @@ contains
     call h5dcreate_f(file_id, trim(dset_path), h5type, dspace_id, dset_id, err_local, &
                      lcpl_id=lcpl_id)
     if (err_local /= 0) then
-      write(*,'(A,A)') "[h5fort_serial_write] ERROR: h5dcreate_f failed for: ", trim(dset_path)
+      write(error_unit,'(A,A)') "[h5fort_serial_write] ERROR: h5dcreate_f failed for: ", trim(dset_path)
       hdferr = err_local
     end if
 
@@ -265,21 +254,15 @@ contains
     call h5pclose_f(lcpl_id, err_local)
   end subroutine create_scalar_dataset
 
-
   !============================================================================
-  ! Implementation of h5fort_swrite for each type/rank combination
-  ! TYPE(*) を避けるため h5dwrite_f は各手続きで直接呼ぶ。
+  ! real64 / real32 / int32 — scalar (0D)
   !============================================================================
-
-  !--------------------------------------------------------------------
-  ! real64, scalar
-  !--------------------------------------------------------------------
   subroutine h5fort_write_r64_0d(file_id, dset_path, scalar, hdferr, mode, attrs, units)
-    integer(hid_t),   intent(in)  :: file_id
-    character(len=*), intent(in)  :: dset_path
-    real(real64),     intent(in)  :: scalar
-    integer,          intent(out) :: hdferr
-    integer,          intent(in), optional :: mode
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    real(real64),         intent(in)  :: scalar
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
     type(t_hdf5_attr), intent(in), optional :: attrs(:)
     character(len=*),  intent(in), optional :: units
     integer(hid_t)   :: dset_id
@@ -295,15 +278,12 @@ contains
     if (present(units)) call write_units_attr(file_id, dset_path, units, err_local)
   end subroutine h5fort_write_r64_0d
 
-  !--------------------------------------------------------------------
-  ! real32, scalar
-  !--------------------------------------------------------------------
   subroutine h5fort_write_r32_0d(file_id, dset_path, scalar, hdferr, mode, attrs, units)
-    integer(hid_t),   intent(in)  :: file_id
-    character(len=*), intent(in)  :: dset_path
-    real(real32),     intent(in)  :: scalar
-    integer,          intent(out) :: hdferr
-    integer,          intent(in), optional :: mode
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    real(real32),         intent(in)  :: scalar
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
     type(t_hdf5_attr), intent(in), optional :: attrs(:)
     character(len=*),  intent(in), optional :: units
     integer(hid_t)   :: dset_id
@@ -319,15 +299,12 @@ contains
     if (present(units)) call write_units_attr(file_id, dset_path, units, err_local)
   end subroutine h5fort_write_r32_0d
 
-  !--------------------------------------------------------------------
-  ! int32, scalar
-  !--------------------------------------------------------------------
   subroutine h5fort_write_i32_0d(file_id, dset_path, scalar, hdferr, mode, attrs, units)
-    integer(hid_t),   intent(in)  :: file_id
-    character(len=*), intent(in)  :: dset_path
-    integer(int32),   intent(in)  :: scalar
-    integer,          intent(out) :: hdferr
-    integer,          intent(in), optional :: mode
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    integer(int32),         intent(in)  :: scalar
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
     type(t_hdf5_attr), intent(in), optional :: attrs(:)
     character(len=*),  intent(in), optional :: units
     integer(hid_t)   :: dset_id
@@ -343,12 +320,16 @@ contains
     if (present(units)) call write_units_attr(file_id, dset_path, units, err_local)
   end subroutine h5fort_write_i32_0d
 
+
+  !============================================================================
+  ! real64 / real32 / int32 — arrays (1D–4D)
+  !============================================================================
   subroutine h5fort_write_r64_1d(file_id, dset_path, array, hdferr, mode, attrs, units)
-    integer(hid_t),   intent(in)  :: file_id
-    character(len=*), intent(in)  :: dset_path
-    real(real64),     intent(in)  :: array(:)
-    integer,          intent(out) :: hdferr
-    integer,          intent(in), optional :: mode
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    real(real64),         intent(in)  :: array(:)
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
     type(t_hdf5_attr), intent(in), optional :: attrs(:)
     character(len=*),  intent(in), optional :: units
     integer(hid_t)   :: dset_id
@@ -365,11 +346,11 @@ contains
   end subroutine h5fort_write_r64_1d
 
   subroutine h5fort_write_r64_2d(file_id, dset_path, array, hdferr, mode, attrs, units)
-    integer(hid_t),   intent(in)  :: file_id
-    character(len=*), intent(in)  :: dset_path
-    real(real64),     intent(in)  :: array(:,:)
-    integer,          intent(out) :: hdferr
-    integer,          intent(in), optional :: mode
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    real(real64),         intent(in)  :: array(:, :)
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
     type(t_hdf5_attr), intent(in), optional :: attrs(:)
     character(len=*),  intent(in), optional :: units
     integer(hid_t)   :: dset_id
@@ -386,11 +367,11 @@ contains
   end subroutine h5fort_write_r64_2d
 
   subroutine h5fort_write_r64_3d(file_id, dset_path, array, hdferr, mode, attrs, units)
-    integer(hid_t),   intent(in)  :: file_id
-    character(len=*), intent(in)  :: dset_path
-    real(real64),     intent(in)  :: array(:,:,:)
-    integer,          intent(out) :: hdferr
-    integer,          intent(in), optional :: mode
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    real(real64),         intent(in)  :: array(:, :, :)
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
     type(t_hdf5_attr), intent(in), optional :: attrs(:)
     character(len=*),  intent(in), optional :: units
     integer(hid_t)   :: dset_id
@@ -407,11 +388,11 @@ contains
   end subroutine h5fort_write_r64_3d
 
   subroutine h5fort_write_r64_4d(file_id, dset_path, array, hdferr, mode, attrs, units)
-    integer(hid_t),   intent(in)  :: file_id
-    character(len=*), intent(in)  :: dset_path
-    real(real64),     intent(in)  :: array(:,:,:,:)
-    integer,          intent(out) :: hdferr
-    integer,          intent(in), optional :: mode
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    real(real64),         intent(in)  :: array(:, :, :, :)
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
     type(t_hdf5_attr), intent(in), optional :: attrs(:)
     character(len=*),  intent(in), optional :: units
     integer(hid_t)   :: dset_id
@@ -428,11 +409,11 @@ contains
   end subroutine h5fort_write_r64_4d
 
   subroutine h5fort_write_r32_1d(file_id, dset_path, array, hdferr, mode, attrs, units)
-    integer(hid_t),   intent(in)  :: file_id
-    character(len=*), intent(in)  :: dset_path
-    real(real32),     intent(in)  :: array(:)
-    integer,          intent(out) :: hdferr
-    integer,          intent(in), optional :: mode
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    real(real32),         intent(in)  :: array(:)
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
     type(t_hdf5_attr), intent(in), optional :: attrs(:)
     character(len=*),  intent(in), optional :: units
     integer(hid_t)   :: dset_id
@@ -449,11 +430,11 @@ contains
   end subroutine h5fort_write_r32_1d
 
   subroutine h5fort_write_r32_2d(file_id, dset_path, array, hdferr, mode, attrs, units)
-    integer(hid_t),   intent(in)  :: file_id
-    character(len=*), intent(in)  :: dset_path
-    real(real32),     intent(in)  :: array(:,:)
-    integer,          intent(out) :: hdferr
-    integer,          intent(in), optional :: mode
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    real(real32),         intent(in)  :: array(:, :)
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
     type(t_hdf5_attr), intent(in), optional :: attrs(:)
     character(len=*),  intent(in), optional :: units
     integer(hid_t)   :: dset_id
@@ -470,11 +451,11 @@ contains
   end subroutine h5fort_write_r32_2d
 
   subroutine h5fort_write_r32_3d(file_id, dset_path, array, hdferr, mode, attrs, units)
-    integer(hid_t),   intent(in)  :: file_id
-    character(len=*), intent(in)  :: dset_path
-    real(real32),     intent(in)  :: array(:,:,:)
-    integer,          intent(out) :: hdferr
-    integer,          intent(in), optional :: mode
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    real(real32),         intent(in)  :: array(:, :, :)
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
     type(t_hdf5_attr), intent(in), optional :: attrs(:)
     character(len=*),  intent(in), optional :: units
     integer(hid_t)   :: dset_id
@@ -491,11 +472,11 @@ contains
   end subroutine h5fort_write_r32_3d
 
   subroutine h5fort_write_r32_4d(file_id, dset_path, array, hdferr, mode, attrs, units)
-    integer(hid_t),   intent(in)  :: file_id
-    character(len=*), intent(in)  :: dset_path
-    real(real32),     intent(in)  :: array(:,:,:,:)
-    integer,          intent(out) :: hdferr
-    integer,          intent(in), optional :: mode
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    real(real32),         intent(in)  :: array(:, :, :, :)
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
     type(t_hdf5_attr), intent(in), optional :: attrs(:)
     character(len=*),  intent(in), optional :: units
     integer(hid_t)   :: dset_id
@@ -512,11 +493,11 @@ contains
   end subroutine h5fort_write_r32_4d
 
   subroutine h5fort_write_i32_1d(file_id, dset_path, array, hdferr, mode, attrs, units)
-    integer(hid_t),   intent(in)  :: file_id
-    character(len=*), intent(in)  :: dset_path
-    integer(int32),   intent(in)  :: array(:)
-    integer,          intent(out) :: hdferr
-    integer,          intent(in), optional :: mode
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    integer(int32),         intent(in)  :: array(:)
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
     type(t_hdf5_attr), intent(in), optional :: attrs(:)
     character(len=*),  intent(in), optional :: units
     integer(hid_t)   :: dset_id
@@ -533,11 +514,11 @@ contains
   end subroutine h5fort_write_i32_1d
 
   subroutine h5fort_write_i32_2d(file_id, dset_path, array, hdferr, mode, attrs, units)
-    integer(hid_t),   intent(in)  :: file_id
-    character(len=*), intent(in)  :: dset_path
-    integer(int32),   intent(in)  :: array(:,:)
-    integer,          intent(out) :: hdferr
-    integer,          intent(in), optional :: mode
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    integer(int32),         intent(in)  :: array(:, :)
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
     type(t_hdf5_attr), intent(in), optional :: attrs(:)
     character(len=*),  intent(in), optional :: units
     integer(hid_t)   :: dset_id
@@ -554,11 +535,11 @@ contains
   end subroutine h5fort_write_i32_2d
 
   subroutine h5fort_write_i32_3d(file_id, dset_path, array, hdferr, mode, attrs, units)
-    integer(hid_t),   intent(in)  :: file_id
-    character(len=*), intent(in)  :: dset_path
-    integer(int32),   intent(in)  :: array(:,:,:)
-    integer,          intent(out) :: hdferr
-    integer,          intent(in), optional :: mode
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    integer(int32),         intent(in)  :: array(:, :, :)
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
     type(t_hdf5_attr), intent(in), optional :: attrs(:)
     character(len=*),  intent(in), optional :: units
     integer(hid_t)   :: dset_id
@@ -575,11 +556,11 @@ contains
   end subroutine h5fort_write_i32_3d
 
   subroutine h5fort_write_i32_4d(file_id, dset_path, array, hdferr, mode, attrs, units)
-    integer(hid_t),   intent(in)  :: file_id
-    character(len=*), intent(in)  :: dset_path
-    integer(int32),   intent(in)  :: array(:,:,:,:)
-    integer,          intent(out) :: hdferr
-    integer,          intent(in), optional :: mode
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    integer(int32),         intent(in)  :: array(:, :, :, :)
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
     type(t_hdf5_attr), intent(in), optional :: attrs(:)
     character(len=*),  intent(in), optional :: units
     integer(hid_t)   :: dset_id
@@ -595,9 +576,10 @@ contains
     if (present(units)) call write_units_attr(file_id, dset_path, units, err_local)
   end subroutine h5fort_write_i32_4d
 
-  !--------------------------------------------------------------------
-  ! character, scalar (可変長文字列)
-  !--------------------------------------------------------------------
+
+  !============================================================================
+  ! character scalar (可変長文字列)
+  !============================================================================
   subroutine h5fort_write_str_0d(file_id, dset_path, str, hdferr, mode, attrs, units)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
@@ -646,7 +628,7 @@ contains
     call h5sclose_f(dspace_id, err_local)
     call h5pclose_f(lcpl_id, err_local)
     if (err_local /= 0) then
-      write(*,'(A,A)') "[h5fort_serial_write] ERROR: h5dcreate_f failed for: ", trim(dset_path)
+      write(error_unit,'(A,A)') "[h5fort_serial_write] ERROR: h5dcreate_f failed for: ", trim(dset_path)
       hdferr = err_local; call h5tclose_f(str_type_id, err_local); return
     end if
 
@@ -657,9 +639,9 @@ contains
     if (present(units)) call write_units_attr(file_id, dset_path, units, err_local)
   end subroutine h5fort_write_str_0d
 
-  !--------------------------------------------------------------------
-  ! logical, scalar – write
-  !--------------------------------------------------------------------
+  !============================================================================
+  ! logical scalar — int32 (0/1) として保存
+  !============================================================================
   subroutine h5fort_write_lgc_0d(file_id, dset_path, scalar, hdferr, mode, attrs, units)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
@@ -683,9 +665,9 @@ contains
     if (present(units)) call write_units_attr(file_id, dset_path, units, err_local)
   end subroutine h5fort_write_lgc_0d
 
-  !--------------------------------------------------------------------
-  ! logical, 1D – write
-  !--------------------------------------------------------------------
+  !============================================================================
+  ! logical arrays (1D–4D)
+  !============================================================================
   subroutine h5fort_write_lgc_1d(file_id, dset_path, array, hdferr, mode, attrs, units)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
@@ -700,7 +682,7 @@ contains
     integer                     :: err_local, mode_
     dims  = shape(array, kind=hsize_t)
     mode_ = 0; if (present(mode)) mode_ = mode
-    allocate(iarray(size(array)))
+    allocate(iarray(size(array,1)))
     iarray = merge(1_int32, 0_int32, array)
     call create_dataset(file_id, dset_path, H5T_NATIVE_INTEGER, 1, dims, dset_id, hdferr, mode_)
     if (hdferr /= 0) return
@@ -710,20 +692,17 @@ contains
     if (present(units)) call write_units_attr(file_id, dset_path, units, err_local)
   end subroutine h5fort_write_lgc_1d
 
-  !--------------------------------------------------------------------
-  ! logical, 2D – write
-  !--------------------------------------------------------------------
   subroutine h5fort_write_lgc_2d(file_id, dset_path, array, hdferr, mode, attrs, units)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
-    logical,          intent(in)  :: array(:,:)
+    logical,          intent(in)  :: array(:, :)
     integer,          intent(out) :: hdferr
     integer,          intent(in), optional :: mode
     type(t_hdf5_attr), intent(in), optional :: attrs(:)
     character(len=*),  intent(in), optional :: units
     integer(hid_t)              :: dset_id
     integer(hsize_t)            :: dims(2)
-    integer(int32), allocatable :: iarray(:,:)
+    integer(int32), allocatable :: iarray(:, :)
     integer                     :: err_local, mode_
     dims  = shape(array, kind=hsize_t)
     mode_ = 0; if (present(mode)) mode_ = mode
@@ -737,20 +716,17 @@ contains
     if (present(units)) call write_units_attr(file_id, dset_path, units, err_local)
   end subroutine h5fort_write_lgc_2d
 
-  !--------------------------------------------------------------------
-  ! logical, 3D – write
-  !--------------------------------------------------------------------
   subroutine h5fort_write_lgc_3d(file_id, dset_path, array, hdferr, mode, attrs, units)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
-    logical,          intent(in)  :: array(:,:,:)
+    logical,          intent(in)  :: array(:, :, :)
     integer,          intent(out) :: hdferr
     integer,          intent(in), optional :: mode
     type(t_hdf5_attr), intent(in), optional :: attrs(:)
     character(len=*),  intent(in), optional :: units
     integer(hid_t)              :: dset_id
     integer(hsize_t)            :: dims(3)
-    integer(int32), allocatable :: iarray(:,:,:)
+    integer(int32), allocatable :: iarray(:, :, :)
     integer                     :: err_local, mode_
     dims  = shape(array, kind=hsize_t)
     mode_ = 0; if (present(mode)) mode_ = mode
@@ -764,20 +740,17 @@ contains
     if (present(units)) call write_units_attr(file_id, dset_path, units, err_local)
   end subroutine h5fort_write_lgc_3d
 
-  !--------------------------------------------------------------------
-  ! logical, 4D – write
-  !--------------------------------------------------------------------
   subroutine h5fort_write_lgc_4d(file_id, dset_path, array, hdferr, mode, attrs, units)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
-    logical,          intent(in)  :: array(:,:,:,:)
+    logical,          intent(in)  :: array(:, :, :, :)
     integer,          intent(out) :: hdferr
     integer,          intent(in), optional :: mode
     type(t_hdf5_attr), intent(in), optional :: attrs(:)
     character(len=*),  intent(in), optional :: units
     integer(hid_t)              :: dset_id
     integer(hsize_t)            :: dims(4)
-    integer(int32), allocatable :: iarray(:,:,:,:)
+    integer(int32), allocatable :: iarray(:, :, :, :)
     integer                     :: err_local, mode_
     dims  = shape(array, kind=hsize_t)
     mode_ = 0; if (present(mode)) mode_ = mode
@@ -790,4 +763,5 @@ contains
     if (present(attrs)) call h5fort_swrite_attr(file_id, dset_path, attrs, err_local)
     if (present(units)) call write_units_attr(file_id, dset_path, units, err_local)
   end subroutine h5fort_write_lgc_4d
+
 end module h5fort_serial_write

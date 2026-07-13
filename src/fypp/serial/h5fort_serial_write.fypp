@@ -1,0 +1,421 @@
+! DO NOT EDIT — generated from src/fypp/serial/h5fort_serial_write.fypp
+! To regenerate: scripts/generate_fypp.sh
+#:include "common.fypp"
+#include "h5fort_serial.inc"
+module h5fort_serial_write
+  use hdf5
+  use,intrinsic :: iso_fortran_env
+  implicit none
+  private
+
+  public :: t_hdf5_attr
+  public :: h5fort_swrite_attr
+  public :: H5FORTRAN_FORCE_WRITE
+
+#:for kname, ftype, h5type in KINDS
+  public :: h5fort_write_${kname}$_0d
+  #:for rank in RANKS
+  public :: h5fort_write_${kname}$_${rank}$d
+  #:endfor
+#:endfor
+  public :: h5fort_write_str_0d
+  public :: h5fort_write_lgc_0d
+#:for rank in RANKS
+  public :: h5fort_write_lgc_${rank}$d
+#:endfor
+
+  integer, parameter :: ATTR_NAME_LEN  = 64
+  integer, parameter :: ATTR_VALUE_LEN = 256
+
+  type :: t_hdf5_attr
+    character(len=ATTR_NAME_LEN)  :: name  = ""
+    character(len=ATTR_VALUE_LEN) :: value = ""
+  end type t_hdf5_attr
+
+  integer, parameter :: H5FORTRAN_FORCE_WRITE = 1
+
+contains
+
+  !============================================================================
+  ! 内部ユーティリティ: データセットの形状を取得する
+  !============================================================================
+  subroutine get_dataset_info(file_id, dset_path, dset_id, rank, dims, hdferr)
+    integer(hid_t),   intent(in)  :: file_id
+    character(len=*), intent(in)  :: dset_path
+    integer(hid_t),   intent(out) :: dset_id
+    integer,          intent(out) :: rank
+    integer(hsize_t), intent(out) :: dims(MAX_RANK)
+    integer,          intent(out) :: hdferr
+
+    integer(hid_t)  :: space_id
+    integer(hsize_t):: maxdims(MAX_RANK)
+    integer         :: err_local
+
+    dims    = 1_hsize_t
+    hdferr  = 0
+
+    call h5dopen_f(file_id, trim(dset_path), dset_id, err_local)
+    if (err_local /= 0) then
+      write(error_unit,'(A,A)') "[h5fort_serial_write] ERROR: h5dopen_f failed for: ", &
+                       trim(dset_path)
+      hdferr = err_local; return
+    end if
+
+    call h5dget_space_f(dset_id, space_id, err_local)
+    if (err_local /= 0) then
+      write(error_unit,'(A)') "[h5fort_serial_write] ERROR: h5dget_space_f failed."
+      hdferr = err_local; return
+    end if
+
+    call h5sget_simple_extent_ndims_f(space_id, rank, err_local)
+    if (err_local /= 0) then
+      write(error_unit,'(A)') "[h5fort_serial_write] ERROR: h5sget_simple_extent_ndims_f failed."
+      hdferr = err_local
+      call h5sclose_f(space_id, err_local)
+      return
+    end if
+
+    if (rank > MAX_RANK) then
+      write(error_unit,'(A,I0)') "[h5fort_serial_write] ERROR: rank exceeds MAX_RANK. rank = ", rank
+      hdferr = -1
+      call h5sclose_f(space_id, err_local)
+      return
+    end if
+
+    call h5sget_simple_extent_dims_f(space_id, dims(1:rank), maxdims(1:rank), err_local)
+    if (err_local < 0) then
+      write(error_unit,'(A)') "[h5fort_serial_write] ERROR: h5sget_simple_extent_dims_f failed."
+      hdferr = err_local
+    end if
+
+    call h5sclose_f(space_id, err_local)
+  end subroutine get_dataset_info
+
+  !----------------------------------------------------------------------------
+  ! write_units_attr: "units" 属性を1件書き込む内部ヘルパー
+  !----------------------------------------------------------------------------
+  subroutine write_units_attr(file_id, dset_path, units, hdferr)
+    integer(hid_t),   intent(in)  :: file_id
+    character(len=*), intent(in)  :: dset_path
+    character(len=*), intent(in)  :: units
+    integer,          intent(out) :: hdferr
+    type(t_hdf5_attr) :: a(1)
+    a(1)%name  = "units"
+    a(1)%value = units
+    call h5fort_swrite_attr(file_id, dset_path, a, hdferr)
+  end subroutine write_units_attr
+
+  !============================================================================
+  ! h5fort_swrite_attr: データセット/グループに文字列 attribute を付与する
+  !============================================================================
+  subroutine h5fort_swrite_attr(file_id, obj_path, attrs, hdferr)
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: obj_path
+    type(t_hdf5_attr), intent(in)  :: attrs(:)
+    integer,           intent(out) :: hdferr
+
+    integer(hid_t)  :: obj_id, attr_id, str_type_id, space_id
+    integer(hsize_t):: dims(1)
+    integer(size_t) :: str_len
+    integer         :: i, err_local
+    logical         :: attr_exists
+
+    dims   = [1_hsize_t]
+    hdferr = 0
+
+    call h5oopen_f(file_id, trim(obj_path), obj_id, hdferr)
+    if (hdferr /= 0) then
+      write(error_unit,'(A,A)') "[h5fort_serial_write] ERROR: h5oopen_f failed for: ", trim(obj_path)
+      return
+    end if
+
+    do i = 1, size(attrs)
+      if (len_trim(attrs(i)%name) == 0) cycle
+
+      call h5tcopy_f(H5T_FORTRAN_S1, str_type_id, err_local)
+      str_len = max(1_size_t, int(len_trim(attrs(i)%value), size_t))
+      call h5tset_size_f(str_type_id, str_len, err_local)
+
+      call h5screate_f(H5S_SCALAR_F, space_id, err_local)
+
+      call h5aexists_f(obj_id, trim(attrs(i)%name), attr_exists, err_local)
+      if (attr_exists) call h5adelete_f(obj_id, trim(attrs(i)%name), err_local)
+
+      call h5acreate_f(obj_id, trim(attrs(i)%name), str_type_id, space_id, attr_id, err_local)
+      if (err_local /= 0) then
+        write(error_unit,'(A,A)') "[h5fort_serial_write] ERROR: h5acreate_f failed for attr: ", &
+                          trim(attrs(i)%name)
+        if (hdferr == 0) hdferr = err_local
+      else
+        call h5awrite_f(attr_id, str_type_id, attrs(i)%value, dims, err_local)
+        if (hdferr == 0) hdferr = err_local
+        call h5aclose_f(attr_id, err_local)
+      end if
+
+      call h5sclose_f(space_id, err_local)
+      call h5tclose_f(str_type_id, err_local)
+    end do
+
+    call h5oclose_f(obj_id, err_local)
+  end subroutine h5fort_swrite_attr
+
+  !============================================================================
+  ! 内部ユーティリティ: 中間グループ自動生成付きでデータセットを作成する
+  !============================================================================
+  subroutine create_dataset(file_id, dset_path, h5type, rank, dims, dset_id, hdferr, mode)
+    integer(hid_t),   intent(in)  :: file_id
+    character(len=*), intent(in)  :: dset_path
+    integer(hid_t),   intent(in)  :: h5type
+    integer,          intent(in)  :: rank
+    integer(hsize_t), intent(in)  :: dims(rank)
+    integer(hid_t),   intent(out) :: dset_id
+    integer,          intent(out) :: hdferr
+    integer,          intent(in)  :: mode
+
+    integer(hid_t) :: lcpl_id, dspace_id
+    integer        :: err_local
+    logical        :: link_exists
+
+    dset_id = -1
+    hdferr  = 0
+
+    if (mode == H5FORTRAN_FORCE_WRITE) then
+      call h5lexists_f(file_id, trim(dset_path), link_exists, err_local)
+      if (link_exists) call h5ldelete_f(file_id, trim(dset_path), err_local)
+    end if
+
+    call h5pcreate_f(H5P_LINK_CREATE_F, lcpl_id, err_local)
+    if (err_local /= 0) then; hdferr = err_local; return; end if
+    call h5pset_create_inter_group_f(lcpl_id, 1, err_local)
+    if (err_local /= 0) then; hdferr = err_local; call h5pclose_f(lcpl_id, err_local); return; end if
+
+    call h5screate_simple_f(rank, dims, dspace_id, err_local)
+    if (err_local /= 0) then; hdferr = err_local; call h5pclose_f(lcpl_id, err_local); return; end if
+
+    call h5dcreate_f(file_id, trim(dset_path), h5type, dspace_id, dset_id, err_local, &
+                     lcpl_id=lcpl_id)
+    if (err_local /= 0) then
+      write(error_unit,'(A,A)') "[h5fort_serial_write] ERROR: h5dcreate_f failed for: ", trim(dset_path)
+      hdferr = err_local
+    end if
+
+    call h5sclose_f(dspace_id, err_local)
+    call h5pclose_f(lcpl_id, err_local)
+  end subroutine create_dataset
+
+  !============================================================================
+  ! 内部ユーティリティ: スカラーデータセットを作成する（H5S_SCALAR_F使用）
+  !============================================================================
+  subroutine create_scalar_dataset(file_id, dset_path, h5type, dset_id, hdferr, mode)
+    integer(hid_t),   intent(in)  :: file_id
+    character(len=*), intent(in)  :: dset_path
+    integer(hid_t),   intent(in)  :: h5type
+    integer(hid_t),   intent(out) :: dset_id
+    integer,          intent(out) :: hdferr
+    integer,          intent(in)  :: mode
+
+    integer(hid_t) :: lcpl_id, dspace_id
+    integer        :: err_local
+    logical        :: link_exists
+
+    dset_id = -1
+    hdferr  = 0
+
+    if (mode == H5FORTRAN_FORCE_WRITE) then
+      call h5lexists_f(file_id, trim(dset_path), link_exists, err_local)
+      if (link_exists) call h5ldelete_f(file_id, trim(dset_path), err_local)
+    end if
+
+    call h5pcreate_f(H5P_LINK_CREATE_F, lcpl_id, err_local)
+    if (err_local /= 0) then; hdferr = err_local; return; end if
+    call h5pset_create_inter_group_f(lcpl_id, 1, err_local)
+    if (err_local /= 0) then; hdferr = err_local; call h5pclose_f(lcpl_id, err_local); return; end if
+
+    call h5screate_f(H5S_SCALAR_F, dspace_id, err_local)
+    if (err_local /= 0) then; hdferr = err_local; call h5pclose_f(lcpl_id, err_local); return; end if
+
+    call h5dcreate_f(file_id, trim(dset_path), h5type, dspace_id, dset_id, err_local, &
+                     lcpl_id=lcpl_id)
+    if (err_local /= 0) then
+      write(error_unit,'(A,A)') "[h5fort_serial_write] ERROR: h5dcreate_f failed for: ", trim(dset_path)
+      hdferr = err_local
+    end if
+
+    call h5sclose_f(dspace_id, err_local)
+    call h5pclose_f(lcpl_id, err_local)
+  end subroutine create_scalar_dataset
+
+  !============================================================================
+  ! real64 / real32 / int32 — scalar (0D)
+  !============================================================================
+#:for kname, ftype, h5type in KINDS
+  subroutine h5fort_write_${kname}$_0d(file_id, dset_path, scalar, hdferr, mode, attrs, units)
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    ${ftype}$,         intent(in)  :: scalar
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+    integer(hid_t)   :: dset_id
+    integer(hsize_t) :: dims(1)
+    integer          :: err_local, mode_
+    dims  = [1_hsize_t]
+    mode_ = 0; if (present(mode)) mode_ = mode
+    call create_scalar_dataset(file_id, dset_path, ${h5type}$, dset_id, hdferr, mode_)
+    if (hdferr /= 0) return
+    call h5dwrite_f(dset_id, ${h5type}$, scalar, dims, hdferr)
+    call h5dclose_f(dset_id, err_local)
+    if (present(attrs)) call h5fort_swrite_attr(file_id, dset_path, attrs, err_local)
+    if (present(units)) call write_units_attr(file_id, dset_path, units, err_local)
+  end subroutine h5fort_write_${kname}$_0d
+
+#:endfor
+
+  !============================================================================
+  ! real64 / real32 / int32 — arrays (1D–4D)
+  !============================================================================
+#:for kname, ftype, h5type in KINDS
+  #:for rank in RANKS
+  subroutine h5fort_write_${kname}$_${rank}$d(file_id, dset_path, array, hdferr, mode, attrs, units)
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    ${ftype}$,         intent(in)  :: array(${', '.join([':']*rank)}$)
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+    integer(hid_t)   :: dset_id
+    integer(hsize_t) :: dims(${rank}$)
+    integer          :: err_local, mode_
+    dims  = shape(array, kind=hsize_t)
+    mode_ = 0; if (present(mode)) mode_ = mode
+    call create_dataset(file_id, dset_path, ${h5type}$, ${rank}$, dims, dset_id, hdferr, mode_)
+    if (hdferr /= 0) return
+    call h5dwrite_f(dset_id, ${h5type}$, array, dims, hdferr)
+    call h5dclose_f(dset_id, err_local)
+    if (present(attrs)) call h5fort_swrite_attr(file_id, dset_path, attrs, err_local)
+    if (present(units)) call write_units_attr(file_id, dset_path, units, err_local)
+  end subroutine h5fort_write_${kname}$_${rank}$d
+
+  #:endfor
+#:endfor
+
+  !============================================================================
+  ! character scalar (可変長文字列)
+  !============================================================================
+  subroutine h5fort_write_str_0d(file_id, dset_path, str, hdferr, mode, attrs, units)
+    integer(hid_t),   intent(in)  :: file_id
+    character(len=*), intent(in)  :: dset_path
+    character(len=*), intent(in)  :: str
+    integer,          intent(out) :: hdferr
+    integer,          intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+
+    integer(hid_t)   :: dset_id, str_type_id, dspace_id, lcpl_id
+    integer(hsize_t) :: dims(1)
+    integer(size_t)  :: str_len
+    integer          :: err_local, mode_
+    logical          :: link_exists
+
+    dims  = [1_hsize_t]
+    mode_ = 0; if (present(mode)) mode_ = mode
+
+    call h5tcopy_f(H5T_FORTRAN_S1, str_type_id, err_local)
+    if (err_local /= 0) then; hdferr = err_local; return; end if
+    str_len = max(1_size_t, int(len_trim(str), size_t))
+    call h5tset_size_f(str_type_id, str_len, err_local)
+    if (err_local /= 0) then
+      hdferr = err_local; call h5tclose_f(str_type_id, err_local); return
+    end if
+
+    if (mode_ == H5FORTRAN_FORCE_WRITE) then
+      call h5lexists_f(file_id, trim(dset_path), link_exists, err_local)
+      if (link_exists) call h5ldelete_f(file_id, trim(dset_path), err_local)
+    end if
+
+    call h5pcreate_f(H5P_LINK_CREATE_F, lcpl_id, err_local)
+    if (err_local /= 0) then
+      hdferr = err_local; call h5tclose_f(str_type_id, err_local); return
+    end if
+    call h5pset_create_inter_group_f(lcpl_id, 1, err_local)
+
+    call h5screate_f(H5S_SCALAR_F, dspace_id, err_local)
+    if (err_local /= 0) then
+      hdferr = err_local
+      call h5pclose_f(lcpl_id, err_local); call h5tclose_f(str_type_id, err_local); return
+    end if
+
+    call h5dcreate_f(file_id, trim(dset_path), str_type_id, dspace_id, dset_id, err_local, &
+                     lcpl_id=lcpl_id)
+    call h5sclose_f(dspace_id, err_local)
+    call h5pclose_f(lcpl_id, err_local)
+    if (err_local /= 0) then
+      write(error_unit,'(A,A)') "[h5fort_serial_write] ERROR: h5dcreate_f failed for: ", trim(dset_path)
+      hdferr = err_local; call h5tclose_f(str_type_id, err_local); return
+    end if
+
+    call h5dwrite_f(dset_id, str_type_id, trim(str), dims, hdferr)
+    call h5dclose_f(dset_id, err_local)
+    call h5tclose_f(str_type_id, err_local)
+    if (present(attrs)) call h5fort_swrite_attr(file_id, dset_path, attrs, err_local)
+    if (present(units)) call write_units_attr(file_id, dset_path, units, err_local)
+  end subroutine h5fort_write_str_0d
+
+  !============================================================================
+  ! logical scalar — int32 (0/1) として保存
+  !============================================================================
+  subroutine h5fort_write_lgc_0d(file_id, dset_path, scalar, hdferr, mode, attrs, units)
+    integer(hid_t),   intent(in)  :: file_id
+    character(len=*), intent(in)  :: dset_path
+    logical,          intent(in)  :: scalar
+    integer,          intent(out) :: hdferr
+    integer,          intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+    integer(hid_t)   :: dset_id
+    integer(hsize_t) :: dims(1)
+    integer(int32)   :: ival
+    integer          :: err_local, mode_
+    dims  = [1_hsize_t]
+    mode_ = 0; if (present(mode)) mode_ = mode
+    ival  = merge(1_int32, 0_int32, scalar)
+    call create_scalar_dataset(file_id, dset_path, H5T_NATIVE_INTEGER, dset_id, hdferr, mode_)
+    if (hdferr /= 0) return
+    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, ival, dims, hdferr)
+    call h5dclose_f(dset_id, err_local)
+    if (present(attrs)) call h5fort_swrite_attr(file_id, dset_path, attrs, err_local)
+    if (present(units)) call write_units_attr(file_id, dset_path, units, err_local)
+  end subroutine h5fort_write_lgc_0d
+
+  !============================================================================
+  ! logical arrays (1D–4D)
+  !============================================================================
+#:for rank in RANKS
+  subroutine h5fort_write_lgc_${rank}$d(file_id, dset_path, array, hdferr, mode, attrs, units)
+    integer(hid_t),   intent(in)  :: file_id
+    character(len=*), intent(in)  :: dset_path
+    logical,          intent(in)  :: array(${', '.join([':']*rank)}$)
+    integer,          intent(out) :: hdferr
+    integer,          intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+    integer(hid_t)              :: dset_id
+    integer(hsize_t)            :: dims(${rank}$)
+    integer(int32), allocatable :: iarray(${', '.join([':']*rank)}$)
+    integer                     :: err_local, mode_
+    dims  = shape(array, kind=hsize_t)
+    mode_ = 0; if (present(mode)) mode_ = mode
+    allocate(iarray(${', '.join(['size(array,' + str(i+1) + ')' for i in range(rank)])}$))
+    iarray = merge(1_int32, 0_int32, array)
+    call create_dataset(file_id, dset_path, H5T_NATIVE_INTEGER, ${rank}$, dims, dset_id, hdferr, mode_)
+    if (hdferr /= 0) return
+    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, iarray, dims, hdferr)
+    call h5dclose_f(dset_id, err_local)
+    if (present(attrs)) call h5fort_swrite_attr(file_id, dset_path, attrs, err_local)
+    if (present(units)) call write_units_attr(file_id, dset_path, units, err_local)
+  end subroutine h5fort_write_lgc_${rank}$d
+
+#:endfor
+end module h5fort_serial_write

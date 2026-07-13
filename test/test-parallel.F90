@@ -46,21 +46,22 @@ program test_parallel
 
   block
     type(t_h5fort_parallel) :: h5fp
-    call open_file("test-parallel-class.h5", H5F_ACC_TRUNC_F, file_id, hdferr); call check(hdferr)
-    call h5fp%write(file_id, "/value", value, hdferr); call check(hdferr)
-    call h5fp%write(file_id, "/coord", coord, hdferr); call check(hdferr)
-    call h5fclose_f(file_id, hdferr); call check(hdferr)
+    h5fp%f_name = "test-parallel-class.h5"
+    call h5fp%open(mode=H5FORTRAN_FORCE_WRITE); call check(h5fp%hdferr)
+    call h5fp%write("/value", value);           call check(h5fp%hdferr)
+    call h5fp%write("/coord", coord);           call check(h5fp%hdferr)
+    call h5fp%close();                          call check(h5fp%hdferr)
 
-    call open_file("test-parallel-class.h5", H5F_ACC_RDONLY_F, file_id, hdferr); call check(hdferr)
-    call h5fp%read(file_id, "/value", value_read, hdferr); call check(hdferr)
-    call h5fp%read_fixed(file_id, "/value", value_fixed, hdferr); call check(hdferr)
-    call h5fp%read(file_id, "/coord", coord_read, hdferr); call check(hdferr)
-    call h5fp%read_fixed(file_id, "/coord", coord_fixed, hdferr); call check(hdferr)
-    call assert(all(abs(value_read - value) < 1.0e-12_real64))
+    call h5fp%open(); call check(h5fp%hdferr)
+    call h5fp%read("/value", value_read);           call check(h5fp%hdferr)
+    call h5fp%read_fixed("/value", value_fixed);    call check(h5fp%hdferr)
+    call h5fp%read("/coord", coord_read);           call check(h5fp%hdferr)
+    call h5fp%read_fixed("/coord", coord_fixed);    call check(h5fp%hdferr)
+    call assert(all(abs(value_read  - value) < 1.0e-12_real64))
     call assert(all(abs(value_fixed - value) < 1.0e-12_real64))
-    call assert(all(abs(coord_read - coord) < 1.0e-12_real64))
+    call assert(all(abs(coord_read  - coord) < 1.0e-12_real64))
     call assert(all(abs(coord_fixed - coord) < 1.0e-12_real64))
-    call h5fclose_f(file_id, hdferr); call check(hdferr)
+    call h5fp%close(); call check(h5fp%hdferr)
   end block
 
   call h5close_f(hdferr); call check(hdferr)

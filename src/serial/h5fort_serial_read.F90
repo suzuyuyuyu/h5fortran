@@ -1,3 +1,5 @@
+! DO NOT EDIT — generated from src/fypp/serial/h5fort_serial_read.fypp
+! To regenerate: scripts/generate_fypp.sh
 #include "h5fort_serial.inc"
 module h5fort_serial_read
   use hdf5
@@ -5,25 +7,37 @@ module h5fort_serial_read
   implicit none
   private
 
-  public :: h5fort_read_r64_0d, h5fort_read_r64_1d, h5fort_read_r64_2d, h5fort_read_r64_3d, h5fort_read_r64_4d
-  public :: h5fort_read_r32_0d, h5fort_read_r32_1d, h5fort_read_r32_2d, h5fort_read_r32_3d, h5fort_read_r32_4d
-  public :: h5fort_read_i32_0d, h5fort_read_i32_1d, h5fort_read_i32_2d, h5fort_read_i32_3d, h5fort_read_i32_4d
+  public :: h5fort_read_r64_0d
+  public :: h5fort_read_r64_1d
+  public :: h5fort_read_r64_2d
+  public :: h5fort_read_r64_3d
+  public :: h5fort_read_r64_4d
+  public :: h5fort_read_r32_0d
+  public :: h5fort_read_r32_1d
+  public :: h5fort_read_r32_2d
+  public :: h5fort_read_r32_3d
+  public :: h5fort_read_r32_4d
+  public :: h5fort_read_i32_0d
+  public :: h5fort_read_i32_1d
+  public :: h5fort_read_i32_2d
+  public :: h5fort_read_i32_3d
+  public :: h5fort_read_i32_4d
   public :: h5fort_read_str_0d
-  public :: h5fort_read_lgc_0d, h5fort_read_lgc_1d, h5fort_read_lgc_2d, h5fort_read_lgc_3d, h5fort_read_lgc_4d
+  public :: h5fort_read_lgc_0d
+  public :: h5fort_read_lgc_1d
+  public :: h5fort_read_lgc_2d
+  public :: h5fort_read_lgc_3d
+  public :: h5fort_read_lgc_4d
 
 contains
-  !============================================================================
-  ! マクロ的に各ランク・各型の実装を記述する
-  ! （FortranにはC言語のようなマクロがないため手動で展開）
-  !============================================================================
 
-  !--------------------------------------------------------------------
-  ! real64, scalar
-  !--------------------------------------------------------------------
+  !============================================================================
+  ! real64 / real32 / int32 — scalar (0D)
+  !============================================================================
   subroutine h5fort_read_r64_0d(file_id, dset_path, scalar, hdferr)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
-    real(real64),     intent(out) :: scalar
+    real(real64),        intent(out) :: scalar
     integer,          intent(out) :: hdferr
 
     integer(hid_t)   :: dset_id
@@ -33,20 +47,17 @@ contains
     dims = [1_hsize_t]
     call h5dopen_f(file_id, trim(dset_path), dset_id, hdferr)
     if (hdferr /= 0) then
-      write(*,'(A,A)') "[h5fort/serial/read] ERROR: h5dopen_f failed for: ", trim(dset_path)
+      write(error_unit,'(A,A)') "[h5fort/serial/read] ERROR: h5dopen_f failed for: ", trim(dset_path)
       return
     end if
     call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, scalar, dims, hdferr)
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_r64_0d
 
-  !--------------------------------------------------------------------
-  ! real32, scalar
-  !--------------------------------------------------------------------
   subroutine h5fort_read_r32_0d(file_id, dset_path, scalar, hdferr)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
-    real(real32),     intent(out) :: scalar
+    real(real32),        intent(out) :: scalar
     integer,          intent(out) :: hdferr
 
     integer(hid_t)   :: dset_id
@@ -56,20 +67,17 @@ contains
     dims = [1_hsize_t]
     call h5dopen_f(file_id, trim(dset_path), dset_id, hdferr)
     if (hdferr /= 0) then
-      write(*,'(A,A)') "[h5fort/serial/read] ERROR: h5dopen_f failed for: ", trim(dset_path)
+      write(error_unit,'(A,A)') "[h5fort/serial/read] ERROR: h5dopen_f failed for: ", trim(dset_path)
       return
     end if
     call h5dread_f(dset_id, H5T_NATIVE_REAL, scalar, dims, hdferr)
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_r32_0d
 
-  !--------------------------------------------------------------------
-  ! int32, scalar
-  !--------------------------------------------------------------------
   subroutine h5fort_read_i32_0d(file_id, dset_path, scalar, hdferr)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
-    integer(int32),   intent(out) :: scalar
+    integer(int32),        intent(out) :: scalar
     integer,          intent(out) :: hdferr
 
     integer(hid_t)   :: dset_id
@@ -79,32 +87,33 @@ contains
     dims = [1_hsize_t]
     call h5dopen_f(file_id, trim(dset_path), dset_id, hdferr)
     if (hdferr /= 0) then
-      write(*,'(A,A)') "[h5fort/serial/read] ERROR: h5dopen_f failed for: ", trim(dset_path)
+      write(error_unit,'(A,A)') "[h5fort/serial/read] ERROR: h5dopen_f failed for: ", trim(dset_path)
       return
     end if
     call h5dread_f(dset_id, H5T_NATIVE_INTEGER, scalar, dims, hdferr)
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_i32_0d
 
-  !--------------------------------------------------------------------
-  ! real64, 1D
-  !--------------------------------------------------------------------
+
+  !============================================================================
+  ! real64 / real32 / int32 — arrays (1D–4D, allocatable)
+  !============================================================================
   subroutine h5fort_read_r64_1d(file_id, dset_path, array, hdferr)
-    integer(hid_t),             intent(in)  :: file_id
-    character(len=*),           intent(in)  :: dset_path
-    real(real64), allocatable,  intent(out) :: array(:)
-    integer,                    intent(out) :: hdferr
+    integer(hid_t),           intent(in)  :: file_id
+    character(len=*),         intent(in)  :: dset_path
+    real(real64), allocatable,   intent(out) :: array(:)
+    integer,                  intent(out) :: hdferr
 
-    integer(hid_t)  :: dset_id
-    integer         :: rank
-    integer(hsize_t):: dims(MAX_RANK)
-    integer         :: err_local
+    integer(hid_t)   :: dset_id
+    integer          :: rank_
+    integer(hsize_t) :: dims(MAX_RANK)
+    integer          :: err_local
 
-    call get_dataset_info(file_id, dset_path, dset_id, rank, dims, hdferr)
+    call get_dataset_info(file_id, dset_path, dset_id, rank_, dims, hdferr)
     if (hdferr /= 0) return
 
-    if (rank /= 1) then
-      write(*,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank, &
+    if (rank_ /= 1) then
+      write(error_unit,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank_, &
                            " but target array is rank-1."
       hdferr = -1; call h5dclose_f(dset_id, err_local); return
     end if
@@ -115,25 +124,22 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_r64_1d
 
-  !--------------------------------------------------------------------
-  ! real64, 2D
-  !--------------------------------------------------------------------
   subroutine h5fort_read_r64_2d(file_id, dset_path, array, hdferr)
-    integer(hid_t),             intent(in)  :: file_id
-    character(len=*),           intent(in)  :: dset_path
-    real(real64), allocatable,  intent(out) :: array(:,:)
-    integer,                    intent(out) :: hdferr
+    integer(hid_t),           intent(in)  :: file_id
+    character(len=*),         intent(in)  :: dset_path
+    real(real64), allocatable,   intent(out) :: array(:, :)
+    integer,                  intent(out) :: hdferr
 
-    integer(hid_t)  :: dset_id
-    integer         :: rank
-    integer(hsize_t):: dims(MAX_RANK)
-    integer         :: err_local
+    integer(hid_t)   :: dset_id
+    integer          :: rank_
+    integer(hsize_t) :: dims(MAX_RANK)
+    integer          :: err_local
 
-    call get_dataset_info(file_id, dset_path, dset_id, rank, dims, hdferr)
+    call get_dataset_info(file_id, dset_path, dset_id, rank_, dims, hdferr)
     if (hdferr /= 0) return
 
-    if (rank /= 2) then
-      write(*,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank, &
+    if (rank_ /= 2) then
+      write(error_unit,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank_, &
                            " but target array is rank-2."
       hdferr = -1; call h5dclose_f(dset_id, err_local); return
     end if
@@ -144,25 +150,22 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_r64_2d
 
-  !--------------------------------------------------------------------
-  ! real64, 3D
-  !--------------------------------------------------------------------
   subroutine h5fort_read_r64_3d(file_id, dset_path, array, hdferr)
-    integer(hid_t),             intent(in)  :: file_id
-    character(len=*),           intent(in)  :: dset_path
-    real(real64), allocatable,  intent(out) :: array(:,:,:)
-    integer,                    intent(out) :: hdferr
+    integer(hid_t),           intent(in)  :: file_id
+    character(len=*),         intent(in)  :: dset_path
+    real(real64), allocatable,   intent(out) :: array(:, :, :)
+    integer,                  intent(out) :: hdferr
 
-    integer(hid_t)  :: dset_id
-    integer         :: rank
-    integer(hsize_t):: dims(MAX_RANK)
-    integer         :: err_local
+    integer(hid_t)   :: dset_id
+    integer          :: rank_
+    integer(hsize_t) :: dims(MAX_RANK)
+    integer          :: err_local
 
-    call get_dataset_info(file_id, dset_path, dset_id, rank, dims, hdferr)
+    call get_dataset_info(file_id, dset_path, dset_id, rank_, dims, hdferr)
     if (hdferr /= 0) return
 
-    if (rank /= 3) then
-      write(*,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank, &
+    if (rank_ /= 3) then
+      write(error_unit,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank_, &
                            " but target array is rank-3."
       hdferr = -1; call h5dclose_f(dset_id, err_local); return
     end if
@@ -173,25 +176,22 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_r64_3d
 
-  !--------------------------------------------------------------------
-  ! real64, 4D
-  !--------------------------------------------------------------------
   subroutine h5fort_read_r64_4d(file_id, dset_path, array, hdferr)
-    integer(hid_t),             intent(in)  :: file_id
-    character(len=*),           intent(in)  :: dset_path
-    real(real64), allocatable,  intent(out) :: array(:,:,:,:)
-    integer,                    intent(out) :: hdferr
+    integer(hid_t),           intent(in)  :: file_id
+    character(len=*),         intent(in)  :: dset_path
+    real(real64), allocatable,   intent(out) :: array(:, :, :, :)
+    integer,                  intent(out) :: hdferr
 
-    integer(hid_t)  :: dset_id
-    integer         :: rank
-    integer(hsize_t):: dims(MAX_RANK)
-    integer         :: err_local
+    integer(hid_t)   :: dset_id
+    integer          :: rank_
+    integer(hsize_t) :: dims(MAX_RANK)
+    integer          :: err_local
 
-    call get_dataset_info(file_id, dset_path, dset_id, rank, dims, hdferr)
+    call get_dataset_info(file_id, dset_path, dset_id, rank_, dims, hdferr)
     if (hdferr /= 0) return
 
-    if (rank /= 4) then
-      write(*,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank, &
+    if (rank_ /= 4) then
+      write(error_unit,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank_, &
                            " but target array is rank-4."
       hdferr = -1; call h5dclose_f(dset_id, err_local); return
     end if
@@ -202,25 +202,22 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_r64_4d
 
-  !--------------------------------------------------------------------
-  ! real32, 1D
-  !--------------------------------------------------------------------
   subroutine h5fort_read_r32_1d(file_id, dset_path, array, hdferr)
-    integer(hid_t),             intent(in)  :: file_id
-    character(len=*),           intent(in)  :: dset_path
-    real(real32), allocatable,  intent(out) :: array(:)
-    integer,                    intent(out) :: hdferr
+    integer(hid_t),           intent(in)  :: file_id
+    character(len=*),         intent(in)  :: dset_path
+    real(real32), allocatable,   intent(out) :: array(:)
+    integer,                  intent(out) :: hdferr
 
-    integer(hid_t)  :: dset_id
-    integer         :: rank
-    integer(hsize_t):: dims(MAX_RANK)
-    integer         :: err_local
+    integer(hid_t)   :: dset_id
+    integer          :: rank_
+    integer(hsize_t) :: dims(MAX_RANK)
+    integer          :: err_local
 
-    call get_dataset_info(file_id, dset_path, dset_id, rank, dims, hdferr)
+    call get_dataset_info(file_id, dset_path, dset_id, rank_, dims, hdferr)
     if (hdferr /= 0) return
 
-    if (rank /= 1) then
-      write(*,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank, &
+    if (rank_ /= 1) then
+      write(error_unit,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank_, &
                            " but target array is rank-1."
       hdferr = -1; call h5dclose_f(dset_id, err_local); return
     end if
@@ -231,25 +228,22 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_r32_1d
 
-  !--------------------------------------------------------------------
-  ! real32, 2D
-  !--------------------------------------------------------------------
   subroutine h5fort_read_r32_2d(file_id, dset_path, array, hdferr)
-    integer(hid_t),             intent(in)  :: file_id
-    character(len=*),           intent(in)  :: dset_path
-    real(real32), allocatable,  intent(out) :: array(:,:)
-    integer,                    intent(out) :: hdferr
+    integer(hid_t),           intent(in)  :: file_id
+    character(len=*),         intent(in)  :: dset_path
+    real(real32), allocatable,   intent(out) :: array(:, :)
+    integer,                  intent(out) :: hdferr
 
-    integer(hid_t)  :: dset_id
-    integer         :: rank
-    integer(hsize_t):: dims(MAX_RANK)
-    integer         :: err_local
+    integer(hid_t)   :: dset_id
+    integer          :: rank_
+    integer(hsize_t) :: dims(MAX_RANK)
+    integer          :: err_local
 
-    call get_dataset_info(file_id, dset_path, dset_id, rank, dims, hdferr)
+    call get_dataset_info(file_id, dset_path, dset_id, rank_, dims, hdferr)
     if (hdferr /= 0) return
 
-    if (rank /= 2) then
-      write(*,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank, &
+    if (rank_ /= 2) then
+      write(error_unit,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank_, &
                            " but target array is rank-2."
       hdferr = -1; call h5dclose_f(dset_id, err_local); return
     end if
@@ -260,25 +254,22 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_r32_2d
 
-  !--------------------------------------------------------------------
-  ! real32, 3D
-  !--------------------------------------------------------------------
   subroutine h5fort_read_r32_3d(file_id, dset_path, array, hdferr)
-    integer(hid_t),             intent(in)  :: file_id
-    character(len=*),           intent(in)  :: dset_path
-    real(real32), allocatable,  intent(out) :: array(:,:,:)
-    integer,                    intent(out) :: hdferr
+    integer(hid_t),           intent(in)  :: file_id
+    character(len=*),         intent(in)  :: dset_path
+    real(real32), allocatable,   intent(out) :: array(:, :, :)
+    integer,                  intent(out) :: hdferr
 
-    integer(hid_t)  :: dset_id
-    integer         :: rank
-    integer(hsize_t):: dims(MAX_RANK)
-    integer         :: err_local
+    integer(hid_t)   :: dset_id
+    integer          :: rank_
+    integer(hsize_t) :: dims(MAX_RANK)
+    integer          :: err_local
 
-    call get_dataset_info(file_id, dset_path, dset_id, rank, dims, hdferr)
+    call get_dataset_info(file_id, dset_path, dset_id, rank_, dims, hdferr)
     if (hdferr /= 0) return
 
-    if (rank /= 3) then
-      write(*,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank, &
+    if (rank_ /= 3) then
+      write(error_unit,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank_, &
                            " but target array is rank-3."
       hdferr = -1; call h5dclose_f(dset_id, err_local); return
     end if
@@ -289,25 +280,22 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_r32_3d
 
-  !--------------------------------------------------------------------
-  ! real32, 4D
-  !--------------------------------------------------------------------
   subroutine h5fort_read_r32_4d(file_id, dset_path, array, hdferr)
-    integer(hid_t),             intent(in)  :: file_id
-    character(len=*),           intent(in)  :: dset_path
-    real(real32), allocatable,  intent(out) :: array(:,:,:,:)
-    integer,                    intent(out) :: hdferr
+    integer(hid_t),           intent(in)  :: file_id
+    character(len=*),         intent(in)  :: dset_path
+    real(real32), allocatable,   intent(out) :: array(:, :, :, :)
+    integer,                  intent(out) :: hdferr
 
-    integer(hid_t)  :: dset_id
-    integer         :: rank
-    integer(hsize_t):: dims(MAX_RANK)
-    integer         :: err_local
+    integer(hid_t)   :: dset_id
+    integer          :: rank_
+    integer(hsize_t) :: dims(MAX_RANK)
+    integer          :: err_local
 
-    call get_dataset_info(file_id, dset_path, dset_id, rank, dims, hdferr)
+    call get_dataset_info(file_id, dset_path, dset_id, rank_, dims, hdferr)
     if (hdferr /= 0) return
 
-    if (rank /= 4) then
-      write(*,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank, &
+    if (rank_ /= 4) then
+      write(error_unit,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank_, &
                            " but target array is rank-4."
       hdferr = -1; call h5dclose_f(dset_id, err_local); return
     end if
@@ -318,25 +306,22 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_r32_4d
 
-  !--------------------------------------------------------------------
-  ! int32, 1D
-  !--------------------------------------------------------------------
   subroutine h5fort_read_i32_1d(file_id, dset_path, array, hdferr)
-    integer(hid_t),               intent(in)  :: file_id
-    character(len=*),             intent(in)  :: dset_path
-    integer(int32), allocatable,  intent(out) :: array(:)
-    integer,                      intent(out) :: hdferr
+    integer(hid_t),           intent(in)  :: file_id
+    character(len=*),         intent(in)  :: dset_path
+    integer(int32), allocatable,   intent(out) :: array(:)
+    integer,                  intent(out) :: hdferr
 
-    integer(hid_t)  :: dset_id
-    integer         :: rank
-    integer(hsize_t):: dims(MAX_RANK)
-    integer         :: err_local
+    integer(hid_t)   :: dset_id
+    integer          :: rank_
+    integer(hsize_t) :: dims(MAX_RANK)
+    integer          :: err_local
 
-    call get_dataset_info(file_id, dset_path, dset_id, rank, dims, hdferr)
+    call get_dataset_info(file_id, dset_path, dset_id, rank_, dims, hdferr)
     if (hdferr /= 0) return
 
-    if (rank /= 1) then
-      write(*,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank, &
+    if (rank_ /= 1) then
+      write(error_unit,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank_, &
                            " but target array is rank-1."
       hdferr = -1; call h5dclose_f(dset_id, err_local); return
     end if
@@ -347,25 +332,22 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_i32_1d
 
-  !--------------------------------------------------------------------
-  ! int32, 2D
-  !--------------------------------------------------------------------
   subroutine h5fort_read_i32_2d(file_id, dset_path, array, hdferr)
-    integer(hid_t),               intent(in)  :: file_id
-    character(len=*),             intent(in)  :: dset_path
-    integer(int32), allocatable,  intent(out) :: array(:,:)
-    integer,                      intent(out) :: hdferr
+    integer(hid_t),           intent(in)  :: file_id
+    character(len=*),         intent(in)  :: dset_path
+    integer(int32), allocatable,   intent(out) :: array(:, :)
+    integer,                  intent(out) :: hdferr
 
-    integer(hid_t)  :: dset_id
-    integer         :: rank
-    integer(hsize_t):: dims(MAX_RANK)
-    integer         :: err_local
+    integer(hid_t)   :: dset_id
+    integer          :: rank_
+    integer(hsize_t) :: dims(MAX_RANK)
+    integer          :: err_local
 
-    call get_dataset_info(file_id, dset_path, dset_id, rank, dims, hdferr)
+    call get_dataset_info(file_id, dset_path, dset_id, rank_, dims, hdferr)
     if (hdferr /= 0) return
 
-    if (rank /= 2) then
-      write(*,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank, &
+    if (rank_ /= 2) then
+      write(error_unit,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank_, &
                            " but target array is rank-2."
       hdferr = -1; call h5dclose_f(dset_id, err_local); return
     end if
@@ -376,25 +358,22 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_i32_2d
 
-  !--------------------------------------------------------------------
-  ! int32, 3D
-  !--------------------------------------------------------------------
   subroutine h5fort_read_i32_3d(file_id, dset_path, array, hdferr)
-    integer(hid_t),               intent(in)  :: file_id
-    character(len=*),             intent(in)  :: dset_path
-    integer(int32), allocatable,  intent(out) :: array(:,:,:)
-    integer,                      intent(out) :: hdferr
+    integer(hid_t),           intent(in)  :: file_id
+    character(len=*),         intent(in)  :: dset_path
+    integer(int32), allocatable,   intent(out) :: array(:, :, :)
+    integer,                  intent(out) :: hdferr
 
-    integer(hid_t)  :: dset_id
-    integer         :: rank
-    integer(hsize_t):: dims(MAX_RANK)
-    integer         :: err_local
+    integer(hid_t)   :: dset_id
+    integer          :: rank_
+    integer(hsize_t) :: dims(MAX_RANK)
+    integer          :: err_local
 
-    call get_dataset_info(file_id, dset_path, dset_id, rank, dims, hdferr)
+    call get_dataset_info(file_id, dset_path, dset_id, rank_, dims, hdferr)
     if (hdferr /= 0) return
 
-    if (rank /= 3) then
-      write(*,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank, &
+    if (rank_ /= 3) then
+      write(error_unit,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank_, &
                            " but target array is rank-3."
       hdferr = -1; call h5dclose_f(dset_id, err_local); return
     end if
@@ -405,25 +384,22 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_i32_3d
 
-  !--------------------------------------------------------------------
-  ! int32, 4D
-  !--------------------------------------------------------------------
   subroutine h5fort_read_i32_4d(file_id, dset_path, array, hdferr)
-    integer(hid_t),               intent(in)  :: file_id
-    character(len=*),             intent(in)  :: dset_path
-    integer(int32), allocatable,  intent(out) :: array(:,:,:,:)
-    integer,                      intent(out) :: hdferr
+    integer(hid_t),           intent(in)  :: file_id
+    character(len=*),         intent(in)  :: dset_path
+    integer(int32), allocatable,   intent(out) :: array(:, :, :, :)
+    integer,                  intent(out) :: hdferr
 
-    integer(hid_t)  :: dset_id
-    integer         :: rank
-    integer(hsize_t):: dims(MAX_RANK)
-    integer         :: err_local
+    integer(hid_t)   :: dset_id
+    integer          :: rank_
+    integer(hsize_t) :: dims(MAX_RANK)
+    integer          :: err_local
 
-    call get_dataset_info(file_id, dset_path, dset_id, rank, dims, hdferr)
+    call get_dataset_info(file_id, dset_path, dset_id, rank_, dims, hdferr)
     if (hdferr /= 0) return
 
-    if (rank /= 4) then
-      write(*,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank, &
+    if (rank_ /= 4) then
+      write(error_unit,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank_, &
                            " but target array is rank-4."
       hdferr = -1; call h5dclose_f(dset_id, err_local); return
     end if
@@ -434,9 +410,10 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_i32_4d
 
-  !--------------------------------------------------------------------
-  ! character, scalar (可変長文字列)
-  !--------------------------------------------------------------------
+
+  !============================================================================
+  ! character scalar (可変長文字列)
+  !============================================================================
   subroutine h5fort_read_str_0d(file_id, dset_path, str, hdferr)
     integer(hid_t),                intent(in)  :: file_id
     character(len=*),              intent(in)  :: dset_path
@@ -475,12 +452,8 @@ contains
   end subroutine h5fort_read_str_0d
 
   !============================================================================
-  ! logical (スカラー・配列): int32 (0/1) として HDF5 に保存・読込
+  ! logical scalar — int32 (0/1) として保存
   !============================================================================
-
-  !--------------------------------------------------------------------
-  ! logical, scalar – read
-  !--------------------------------------------------------------------
   subroutine h5fort_read_lgc_0d(file_id, dset_path, scalar, hdferr)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
@@ -495,7 +468,7 @@ contains
     dims = [1_hsize_t]
     call h5dopen_f(file_id, trim(dset_path), dset_id, hdferr)
     if (hdferr /= 0) then
-      write(*,'(A,A)') "[h5fort_serial_write] ERROR: h5dopen_f failed for: ", trim(dset_path)
+      write(error_unit,'(A,A)') "[h5fort_serial_write] ERROR: h5dopen_f failed for: ", trim(dset_path)
       return
     end if
     call h5dread_f(dset_id, H5T_NATIVE_INTEGER, ival, dims, hdferr)
@@ -503,26 +476,26 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_lgc_0d
 
-  !--------------------------------------------------------------------
-  ! logical, 1D – read
-  !--------------------------------------------------------------------
+  !============================================================================
+  ! logical arrays (1D–4D)
+  !============================================================================
   subroutine h5fort_read_lgc_1d(file_id, dset_path, array, hdferr)
-    integer(hid_t),        intent(in)  :: file_id
-    character(len=*),      intent(in)  :: dset_path
-    logical, allocatable,  intent(out) :: array(:)
-    integer,               intent(out) :: hdferr
+    integer(hid_t),       intent(in)  :: file_id
+    character(len=*),     intent(in)  :: dset_path
+    logical, allocatable, intent(out) :: array(:)
+    integer,              intent(out) :: hdferr
 
     integer(hid_t)              :: dset_id
-    integer                     :: rank
+    integer                     :: rank_
     integer(hsize_t)            :: dims(MAX_RANK)
     integer(int32), allocatable :: iarray(:)
     integer                     :: err_local
 
-    call get_dataset_info(file_id, dset_path, dset_id, rank, dims, hdferr)
+    call get_dataset_info(file_id, dset_path, dset_id, rank_, dims, hdferr)
     if (hdferr /= 0) return
 
-    if (rank /= 1) then
-      write(*,'(A,I0,A)') "[h5fort_serial_write] ERROR: dataset rank=", rank, &
+    if (rank_ /= 1) then
+      write(error_unit,'(A,I0,A)') "[h5fort_serial_write] ERROR: dataset rank=", rank_, &
                            " but target array is rank-1."
       hdferr = -1; call h5dclose_f(dset_id, err_local); return
     end if
@@ -534,26 +507,23 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_lgc_1d
 
-  !--------------------------------------------------------------------
-  ! logical, 2D – read
-  !--------------------------------------------------------------------
   subroutine h5fort_read_lgc_2d(file_id, dset_path, array, hdferr)
-    integer(hid_t),        intent(in)  :: file_id
-    character(len=*),      intent(in)  :: dset_path
-    logical, allocatable,  intent(out) :: array(:,:)
-    integer,               intent(out) :: hdferr
+    integer(hid_t),       intent(in)  :: file_id
+    character(len=*),     intent(in)  :: dset_path
+    logical, allocatable, intent(out) :: array(:, :)
+    integer,              intent(out) :: hdferr
 
     integer(hid_t)              :: dset_id
-    integer                     :: rank
+    integer                     :: rank_
     integer(hsize_t)            :: dims(MAX_RANK)
-    integer(int32), allocatable :: iarray(:,:)
+    integer(int32), allocatable :: iarray(:, :)
     integer                     :: err_local
 
-    call get_dataset_info(file_id, dset_path, dset_id, rank, dims, hdferr)
+    call get_dataset_info(file_id, dset_path, dset_id, rank_, dims, hdferr)
     if (hdferr /= 0) return
 
-    if (rank /= 2) then
-      write(*,'(A,I0,A)') "[h5fort_serial_write] ERROR: dataset rank=", rank, &
+    if (rank_ /= 2) then
+      write(error_unit,'(A,I0,A)') "[h5fort_serial_write] ERROR: dataset rank=", rank_, &
                            " but target array is rank-2."
       hdferr = -1; call h5dclose_f(dset_id, err_local); return
     end if
@@ -565,26 +535,23 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_lgc_2d
 
-  !--------------------------------------------------------------------
-  ! logical, 3D – read
-  !--------------------------------------------------------------------
   subroutine h5fort_read_lgc_3d(file_id, dset_path, array, hdferr)
-    integer(hid_t),        intent(in)  :: file_id
-    character(len=*),      intent(in)  :: dset_path
-    logical, allocatable,  intent(out) :: array(:,:,:)
-    integer,               intent(out) :: hdferr
+    integer(hid_t),       intent(in)  :: file_id
+    character(len=*),     intent(in)  :: dset_path
+    logical, allocatable, intent(out) :: array(:, :, :)
+    integer,              intent(out) :: hdferr
 
     integer(hid_t)              :: dset_id
-    integer                     :: rank
+    integer                     :: rank_
     integer(hsize_t)            :: dims(MAX_RANK)
-    integer(int32), allocatable :: iarray(:,:,:)
+    integer(int32), allocatable :: iarray(:, :, :)
     integer                     :: err_local
 
-    call get_dataset_info(file_id, dset_path, dset_id, rank, dims, hdferr)
+    call get_dataset_info(file_id, dset_path, dset_id, rank_, dims, hdferr)
     if (hdferr /= 0) return
 
-    if (rank /= 3) then
-      write(*,'(A,I0,A)') "[h5fort_serial_write] ERROR: dataset rank=", rank, &
+    if (rank_ /= 3) then
+      write(error_unit,'(A,I0,A)') "[h5fort_serial_write] ERROR: dataset rank=", rank_, &
                            " but target array is rank-3."
       hdferr = -1; call h5dclose_f(dset_id, err_local); return
     end if
@@ -596,26 +563,23 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_lgc_3d
 
-  !--------------------------------------------------------------------
-  ! logical, 4D – read
-  !--------------------------------------------------------------------
   subroutine h5fort_read_lgc_4d(file_id, dset_path, array, hdferr)
-    integer(hid_t),        intent(in)  :: file_id
-    character(len=*),      intent(in)  :: dset_path
-    logical, allocatable,  intent(out) :: array(:,:,:,:)
-    integer,               intent(out) :: hdferr
+    integer(hid_t),       intent(in)  :: file_id
+    character(len=*),     intent(in)  :: dset_path
+    logical, allocatable, intent(out) :: array(:, :, :, :)
+    integer,              intent(out) :: hdferr
 
     integer(hid_t)              :: dset_id
-    integer                     :: rank
+    integer                     :: rank_
     integer(hsize_t)            :: dims(MAX_RANK)
-    integer(int32), allocatable :: iarray(:,:,:,:)
+    integer(int32), allocatable :: iarray(:, :, :, :)
     integer                     :: err_local
 
-    call get_dataset_info(file_id, dset_path, dset_id, rank, dims, hdferr)
+    call get_dataset_info(file_id, dset_path, dset_id, rank_, dims, hdferr)
     if (hdferr /= 0) return
 
-    if (rank /= 4) then
-      write(*,'(A,I0,A)') "[h5fort_serial_write] ERROR: dataset rank=", rank, &
+    if (rank_ /= 4) then
+      write(error_unit,'(A,I0,A)') "[h5fort_serial_write] ERROR: dataset rank=", rank_, &
                            " but target array is rank-4."
       hdferr = -1; call h5dclose_f(dset_id, err_local); return
     end if

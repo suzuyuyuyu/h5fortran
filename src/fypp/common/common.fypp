@@ -1,0 +1,24 @@
+#:set KINDS = [&
+  ('r64', 'real(real64)', 'H5T_NATIVE_DOUBLE'), &
+  ('r32', 'real(real32)', 'H5T_NATIVE_REAL'), &
+  ('i32', 'integer(int32)', 'H5T_NATIVE_INTEGER') &
+]
+#:set RANKS = [1, 2, 3, 4]
+
+#:def CHECK_SHAPE(array, expected, msg)
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => ${expected}$)
+    if (rank(${array}$) /= size(check_shape_expected__)) then
+      error stop ${msg}$
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(${array}$, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop ${msg}$
+      end if
+    end do
+  end associate
+end block
+#:enddef CHECK_SHAPE

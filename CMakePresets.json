@@ -7,7 +7,7 @@
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_Fortran_COMPILER": "mpiifx",
-        "H5FORTRAN_PHDF5_ROOT": "$env{HOME}/.local/opt/intel/phdf5"
+        "CMAKE_INSTALL_PREFIX": "$env{HOME}/.local/h5fortran"
       }
     }
   ],

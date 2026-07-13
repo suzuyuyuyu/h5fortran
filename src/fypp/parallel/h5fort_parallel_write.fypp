@@ -1,0 +1,295 @@
+! DO NOT EDIT — generated from src/fypp/parallel/h5fort_parallel_write.fypp
+! To regenerate: scripts/generate_fypp.sh
+#:include "common.fypp"
+#:set RANK_NX = {1: [], 2: ['ncomp'], 3: ['n1', 'n2'], 4: ['n1', 'n2', 'n3']}
+#include "h5fort_config.inc"
+#include "h5fort_parallel.inc"
+module h5fort_parallel_write
+  use hdf5
+  use mpi
+  use, intrinsic :: iso_fortran_env
+  implicit none
+  private
+
+#:for kname, ftype, h5type in KINDS
+  public :: h5fort_write_${kname}$_0d, ${', '.join(['h5fort_write_' + kname + '_' + str(r) + 'd' for r in RANKS])}$
+#:endfor
+  public :: h5fort_write_str_0d
+  public :: h5fort_write_lgc_0d, ${', '.join(['h5fort_write_lgc_' + str(r) + 'd' for r in RANKS])}$
+
+  character(len=*), parameter :: COUNT_DATASET_NAME  = H5FORT_DSET_COUNT_DNAME
+  character(len=*), parameter :: OFFSET_DATASET_NAME = H5FORT_DSET_OFFSET_DNAME
+
+contains
+
+  subroutine begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    integer(int64), intent(in) :: nlocal
+    integer(hid_t), intent(out) :: group_id, xfer_id
+    integer(int64), allocatable, intent(out) :: count_(:), offset_(:)
+    integer(int64), intent(out) :: ntotal
+    integer(int64), intent(out) :: local_offset
+    integer, intent(out) :: hdferr
+
+    integer :: me, nprocs, r, mpi_err
+
+    hdferr = 0
+    group_id = -1_hid_t
+    xfer_id  = -1_hid_t
+
+    call MPI_Comm_rank(MPI_COMM_WORLD, me, mpi_err)
+    call MPI_Comm_size(MPI_COMM_WORLD, nprocs, mpi_err)
+    if (mpi_err /= MPI_SUCCESS) then
+      hdferr = -1
+      return
+    end if
+
+    allocate(count_(0:nprocs - 1), offset_(0:nprocs - 1))
+    call MPI_Allgather(nlocal, 1, MPI_INTEGER8, count_, 1, MPI_INTEGER8, MPI_COMM_WORLD, mpi_err)
+    if (mpi_err /= MPI_SUCCESS) then
+      hdferr = -1
+      return
+    end if
+
+    ntotal = 0_int64
+    do r = 0, nprocs - 1
+      offset_(r) = ntotal
+      ntotal = ntotal + count_(r)
+    end do
+    local_offset = offset_(me)
+
+    call h5gcreate_f(file_id, trim(dset_path), group_id, hdferr)
+    if (hdferr /= 0) then
+      write(error_unit, '(a,a)') "[h5fort/parallel/write] ERROR: h5gcreate_f failed for: ", trim(dset_path)
+      return
+    end if
+
+    call h5pcreate_f(H5P_DATASET_XFER_F, xfer_id, hdferr)
+    if (hdferr /= 0) return
+    call h5pset_dxpl_mpio_f(xfer_id, H5FD_MPIO_COLLECTIVE_F, hdferr)
+  end subroutine begin_parallel_write
+
+  subroutine end_parallel_write(group_id, xfer_id, hdferr)
+    integer(hid_t), intent(in) :: group_id, xfer_id
+    integer, intent(inout) :: hdferr
+
+    integer :: err_local
+
+    if (xfer_id >= 0_hid_t) then
+      call h5pclose_f(xfer_id, err_local)
+      if (hdferr == 0) hdferr = err_local
+    end if
+    if (group_id >= 0_hid_t) then
+      call h5gclose_f(group_id, err_local)
+      if (hdferr == 0) hdferr = err_local
+    end if
+  end subroutine end_parallel_write
+
+  subroutine write_partition(group_id, count_, offset_, xfer_id, hdferr)
+    integer(hid_t), intent(in) :: group_id, xfer_id
+    integer(int64), intent(in) :: count_(0:), offset_(0:)
+    integer, intent(out) :: hdferr
+
+    call write_i64_partition_dataset(group_id, trim(COUNT_DATASET_NAME),  count_,  xfer_id, hdferr)
+    if (hdferr /= 0) return
+    call write_i64_partition_dataset(group_id, trim(OFFSET_DATASET_NAME), offset_, xfer_id, hdferr)
+  end subroutine write_partition
+
+  subroutine write_i64_partition_dataset(group_id, dname, array, xfer_id, hdferr)
+    integer(hid_t), intent(in) :: group_id, xfer_id
+    character(len=*), intent(in) :: dname
+    integer(int64), intent(in) :: array(0:)
+    integer, intent(out) :: hdferr
+
+    integer(hid_t) :: file_space_id, mem_space_id, dset_id
+    integer(hsize_t) :: dims_f(1), dims_m(1), hstart(1), hcount(1)
+    integer(hid_t) :: h5t_i64
+    integer :: me, nprocs, mpi_err, err_local
+
+    call MPI_Comm_rank(MPI_COMM_WORLD, me, mpi_err)
+    call MPI_Comm_size(MPI_COMM_WORLD, nprocs, mpi_err)
+    if (nprocs /= size(array)) then
+      hdferr = -1
+      return
+    end if
+    dims_f(1) = int(nprocs, hsize_t)
+    dims_m(1) = 1_hsize_t
+    hstart(1) = int(me, hsize_t)
+    hcount(1) = 1_hsize_t
+    h5t_i64 = h5kind_to_type(int64, H5_INTEGER_KIND)
+
+    call h5screate_simple_f(1, dims_f, file_space_id, hdferr)
+    if (hdferr /= 0) return
+    call h5dcreate_f(group_id, trim(dname), h5t_i64, file_space_id, dset_id, hdferr)
+    if (hdferr == 0) then
+      call h5sselect_hyperslab_f(file_space_id, H5S_SELECT_SET_F, hstart, hcount, hdferr)
+      if (hdferr == 0) call h5screate_simple_f(1, dims_m, mem_space_id, hdferr)
+      if (hdferr == 0) call h5dwrite_f(dset_id, h5t_i64, array(me:me), dims_m, hdferr, &
+        mem_space_id=mem_space_id, file_space_id=file_space_id, xfer_prp=xfer_id)
+      if (hdferr == 0) call h5sclose_f(mem_space_id, err_local)
+      call h5dclose_f(dset_id, err_local)
+      if (hdferr == 0) hdferr = err_local
+    end if
+    call h5sclose_f(file_space_id, err_local)
+    if (hdferr == 0) hdferr = err_local
+  end subroutine write_i64_partition_dataset
+
+  !============================================================================
+  ! 内部ヘルパー: write_{rank}d_{kname}
+  !============================================================================
+#:for rank in RANKS
+  #:for kname, ftype, h5type in KINDS
+  subroutine write_${rank}$d_${kname}$(group_id, dname, array, h5type, ${(', '.join(RANK_NX[rank]) + ', ') if RANK_NX[rank] else ''}$nlocal, off, ntotal, xfer_id, hdferr)
+    integer(hid_t), intent(in) :: group_id, h5type, xfer_id
+    character(len=*), intent(in) :: dname
+    ${ftype}$, intent(in) :: array(${', '.join([':']*rank)}$)
+    #:for nx in RANK_NX[rank]
+    integer(int64), intent(in) :: ${nx}$
+    #:endfor
+    integer(int64), intent(in) :: nlocal, off, ntotal
+    integer, intent(out) :: hdferr
+    integer(hid_t) :: fsid, msid, did
+    integer(hsize_t) :: dims_f(${rank}$), dims_m(${rank}$)
+    integer :: err_local
+
+    #:if rank == 1
+    dims_f = [int(ntotal, hsize_t)]
+    #:elif rank == 2
+    dims_f = [int(ncomp, hsize_t), int(ntotal, hsize_t)]
+    #:elif rank == 3
+    dims_f = [int(n1, hsize_t), int(n2, hsize_t), int(ntotal, hsize_t)]
+    #:elif rank == 4
+    dims_f = [int(n1, hsize_t), int(n2, hsize_t), int(n3, hsize_t), int(ntotal, hsize_t)]
+    #:endif
+    call h5screate_simple_f(${rank}$, dims_f, fsid, hdferr)
+    if (hdferr /= 0) return
+    call h5dcreate_f(group_id, trim(dname), h5type, fsid, did, hdferr)
+    if (hdferr /= 0) then
+      call h5sclose_f(fsid, err_local)
+      return
+    end if
+    #:if rank == 1
+    call select_1d_slab(fsid, nlocal, off, dims_m, msid, hdferr)
+    #:elif rank == 2
+    call select_2d_slab(fsid, ncomp, nlocal, off, dims_m, msid, hdferr)
+    #:elif rank == 3
+    call select_3d_slab(fsid, n1, n2, nlocal, off, dims_m, msid, hdferr)
+    #:elif rank == 4
+    call select_4d_slab(fsid, n1, n2, n3, nlocal, off, dims_m, msid, hdferr)
+    #:endif
+    if (hdferr == 0) call h5dwrite_f(did, h5type, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
+    call h5dclose_f(did, err_local)
+    if (hdferr == 0) hdferr = err_local
+    call h5sclose_f(fsid, err_local)
+    if (hdferr == 0) hdferr = err_local
+    call h5sclose_f(msid, err_local)
+    if (hdferr == 0) hdferr = err_local
+  end subroutine write_${rank}$d_${kname}$
+
+  #:endfor
+#:endfor
+
+  !============================================================================
+  ! h5fort_write_{kname}_0d — scalar (1D に委譲)
+  !============================================================================
+#:for kname, ftype, h5type in KINDS
+  subroutine h5fort_write_${kname}$_0d(file_id, dset_path, scalar, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    ${ftype}$, intent(in) :: scalar
+    integer, intent(out) :: hdferr
+    ${ftype}$ :: tmp(1)
+    tmp(1) = scalar
+    call h5fort_write_${kname}$_1d(file_id, dset_path, tmp, hdferr)
+  end subroutine h5fort_write_${kname}$_0d
+
+#:endfor
+
+  !============================================================================
+  ! h5fort_write_{kname}_{rank}d — 1D–4D
+  !============================================================================
+#:for kname, ftype, h5type in KINDS
+  #:for rank in RANKS
+  subroutine h5fort_write_${kname}$_${rank}$d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    ${ftype}$, intent(in) :: array(${', '.join([':']*rank)}$)
+    integer, intent(out) :: hdferr
+
+    integer(int64), allocatable :: count_(:), offset_(:)
+    #:for nx in RANK_NX[rank]
+    integer(int64) :: ${nx}$
+    #:endfor
+    integer(int64) :: nlocal, ntotal, local_offset
+    integer(hid_t) :: group_id, xfer_id
+    #:if kname == 'i32'
+    integer(hid_t) :: h5t_i32
+    #:endif
+
+    #:for i, nx in enumerate(RANK_NX[rank])
+    ${nx}$ = int(size(array, ${i + 1}$), int64)
+    #:endfor
+    nlocal = int(size(array, ${rank}$), int64)
+    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    #:if kname == 'i32'
+    h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
+    call write_${rank}$d_${kname}$(group_id, "data", array, h5t_i32, ${(', '.join(RANK_NX[rank]) + ', ') if RANK_NX[rank] else ''}$nlocal, local_offset, ntotal, xfer_id, hdferr)
+    #:else
+    call write_${rank}$d_${kname}$(group_id, "data", array, ${h5type}$, ${(', '.join(RANK_NX[rank]) + ', ') if RANK_NX[rank] else ''}$nlocal, local_offset, ntotal, xfer_id, hdferr)
+    #:endif
+    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
+    call end_parallel_write(group_id, xfer_id, hdferr)
+  end subroutine h5fort_write_${kname}$_${rank}$d
+
+  #:endfor
+#:endfor
+
+  !============================================================================
+  ! h5fort_write_str_0d — parallel では未実装
+  !============================================================================
+  subroutine h5fort_write_str_0d(file_id, dset_path, str, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    character(len=*), intent(in) :: str
+    integer, intent(out) :: hdferr
+
+    write(error_unit, '(a,a)') "[h5fort/parallel/write] ERROR: parallel string write is not implemented: ", trim(dset_path)
+    hdferr = -1
+  end subroutine h5fort_write_str_0d
+
+  !============================================================================
+  ! h5fort_write_lgc_{rank}d — logical (int32 として保存)
+  !============================================================================
+  subroutine h5fort_write_lgc_0d(file_id, dset_path, scalar, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    logical, intent(in) :: scalar
+    integer, intent(out) :: hdferr
+    integer(int32) :: ival
+
+    ival = merge(1_int32, 0_int32, scalar)
+    call h5fort_write_i32_0d(file_id, dset_path, ival, hdferr)
+  end subroutine h5fort_write_lgc_0d
+
+#:for rank in RANKS
+  subroutine h5fort_write_lgc_${rank}$d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    logical, intent(in) :: array(${', '.join([':']*rank)}$)
+    integer, intent(out) :: hdferr
+    integer(int32), allocatable :: iarray(${', '.join([':']*rank)}$)
+
+    allocate(iarray(${', '.join(['size(array,' + str(i+1) + ')' for i in range(rank)])}$))
+    iarray = merge(1_int32, 0_int32, array)
+    call h5fort_write_i32_${rank}$d(file_id, dset_path, iarray, hdferr)
+  end subroutine h5fort_write_lgc_${rank}$d
+
+#:endfor
+
+  !============================================================================
+  ! Helper subroutines for selecting hyperslabs and creating memory spaces.
+  !============================================================================
+  include "h5fort_parallel_read_slabs.inc"
+end module h5fort_parallel_write

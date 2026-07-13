@@ -43,3 +43,5 @@ CMakeUserPresets.json
 *.h5
 
 *.png
+
+temp/

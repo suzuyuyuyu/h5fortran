@@ -1,3 +1,5 @@
+! DO NOT EDIT — generated from src/fypp/parallel/h5fort_parallel_write.fypp
+! To regenerate: scripts/generate_fypp.sh
 #include "h5fort_config.inc"
 #include "h5fort_parallel.inc"
 module h5fort_parallel_write
@@ -13,7 +15,7 @@ module h5fort_parallel_write
   public :: h5fort_write_str_0d
   public :: h5fort_write_lgc_0d, h5fort_write_lgc_1d, h5fort_write_lgc_2d, h5fort_write_lgc_3d, h5fort_write_lgc_4d
 
-  character(len=*), parameter :: COUNT_DATASET_NAME = H5FORT_DSET_COUNT_DNAME
+  character(len=*), parameter :: COUNT_DATASET_NAME  = H5FORT_DSET_COUNT_DNAME
   character(len=*), parameter :: OFFSET_DATASET_NAME = H5FORT_DSET_OFFSET_DNAME
 
 contains
@@ -32,7 +34,7 @@ contains
 
     hdferr = 0
     group_id = -1_hid_t
-    xfer_id = -1_hid_t
+    xfer_id  = -1_hid_t
 
     call MPI_Comm_rank(MPI_COMM_WORLD, me, mpi_err)
     call MPI_Comm_size(MPI_COMM_WORLD, nprocs, mpi_err)
@@ -87,7 +89,7 @@ contains
     integer(int64), intent(in) :: count_(0:), offset_(0:)
     integer, intent(out) :: hdferr
 
-    call write_i64_partition_dataset(group_id, trim(COUNT_DATASET_NAME), count_, xfer_id, hdferr)
+    call write_i64_partition_dataset(group_id, trim(COUNT_DATASET_NAME),  count_,  xfer_id, hdferr)
     if (hdferr /= 0) return
     call write_i64_partition_dataset(group_id, trim(OFFSET_DATASET_NAME), offset_, xfer_id, hdferr)
   end subroutine write_partition
@@ -123,7 +125,7 @@ contains
       if (hdferr == 0) call h5screate_simple_f(1, dims_m, mem_space_id, hdferr)
       if (hdferr == 0) call h5dwrite_f(dset_id, h5t_i64, array(me:me), dims_m, hdferr, &
         mem_space_id=mem_space_id, file_space_id=file_space_id, xfer_prp=xfer_id)
-      if (hdferr == 0) call h5sclose_f(mem_space_id, hdferr)
+      if (hdferr == 0) call h5sclose_f(mem_space_id, err_local)
       call h5dclose_f(dset_id, err_local)
       if (hdferr == 0) hdferr = err_local
     end if
@@ -132,365 +134,8 @@ contains
   end subroutine write_i64_partition_dataset
 
   !============================================================================
-  ! Implementation of h5fort_pwrite for each type/rank combination
+  ! 内部ヘルパー: write_{rank}d_{kname}
   !============================================================================
-  subroutine h5fort_write_r64_0d(file_id, dset_path, scalar, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    real(real64), intent(in) :: scalar
-    integer, intent(out) :: hdferr
-    real(real64) :: array(1)
-
-    array(1) = scalar
-    call h5fort_write_r64_1d(file_id, dset_path, array, hdferr)
-  end subroutine h5fort_write_r64_0d
-
-  subroutine h5fort_write_r64_1d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    real(real64), intent(in) :: array(:)
-    integer, intent(out) :: hdferr
-
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: nlocal, ntotal, local_offset
-    integer(hid_t) :: group_id, xfer_id
-
-    nlocal = int(size(array, 1), int64)
-    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
-    if (hdferr /= 0) return
-
-    call write_1d_r64(group_id, "data", array, H5T_NATIVE_DOUBLE, nlocal, local_offset, ntotal, xfer_id, hdferr)
-    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
-    call end_parallel_write(group_id, xfer_id, hdferr)
-  end subroutine h5fort_write_r64_1d
-
-  subroutine h5fort_write_r64_2d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    real(real64), intent(in) :: array(:, :)
-    integer, intent(out) :: hdferr
-
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: ncomp, nlocal, ntotal, local_offset
-    integer(hid_t) :: group_id, xfer_id
-
-    ncomp = int(size(array, 1), int64)
-    nlocal = int(size(array, 2), int64)
-    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
-    if (hdferr /= 0) return
-
-    call write_2d_r64(group_id, "data", array, H5T_NATIVE_DOUBLE, ncomp, nlocal, local_offset, ntotal, xfer_id, hdferr)
-    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
-    call end_parallel_write(group_id, xfer_id, hdferr)
-  end subroutine h5fort_write_r64_2d
-
-  subroutine h5fort_write_r64_3d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    real(real64), intent(in) :: array(:, :, :)
-    integer, intent(out) :: hdferr
-
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: n1, n2, nlocal, ntotal, local_offset
-    integer(hid_t) :: group_id, xfer_id
-
-    n1 = int(size(array, 1), int64)
-    n2 = int(size(array, 2), int64)
-    nlocal = int(size(array, 3), int64)
-    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
-    if (hdferr /= 0) return
-
-    call write_3d_r64(group_id, "data", array, H5T_NATIVE_DOUBLE, n1, n2, nlocal, local_offset, ntotal, xfer_id, hdferr)
-    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
-    call end_parallel_write(group_id, xfer_id, hdferr)
-  end subroutine h5fort_write_r64_3d
-
-  subroutine h5fort_write_r64_4d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    real(real64), intent(in) :: array(:, :, :, :)
-    integer, intent(out) :: hdferr
-
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: n1, n2, n3, nlocal, ntotal, local_offset
-    integer(hid_t) :: group_id, xfer_id
-
-    n1 = int(size(array, 1), int64)
-    n2 = int(size(array, 2), int64)
-    n3 = int(size(array, 3), int64)
-    nlocal = int(size(array, 4), int64)
-    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
-    if (hdferr /= 0) return
-
-    call write_4d_r64(group_id, "data", array, H5T_NATIVE_DOUBLE, n1, n2, n3, nlocal, local_offset, ntotal, xfer_id, hdferr)
-    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
-    call end_parallel_write(group_id, xfer_id, hdferr)
-  end subroutine h5fort_write_r64_4d
-
-  subroutine h5fort_write_r32_0d(file_id, dset_path, scalar, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    real(real32), intent(in) :: scalar
-    integer, intent(out) :: hdferr
-    real(real32) :: array(1)
-
-    array(1) = scalar
-    call h5fort_write_r32_1d(file_id, dset_path, array, hdferr)
-  end subroutine h5fort_write_r32_0d
-
-  subroutine h5fort_write_r32_1d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    real(real32), intent(in) :: array(:)
-    integer, intent(out) :: hdferr
-
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: nlocal, ntotal, local_offset
-    integer(hid_t) :: group_id, xfer_id
-
-    nlocal = int(size(array, 1), int64)
-    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
-    if (hdferr /= 0) return
-
-    call write_1d_r32(group_id, "data", array, H5T_NATIVE_REAL, nlocal, local_offset, ntotal, xfer_id, hdferr)
-    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
-    call end_parallel_write(group_id, xfer_id, hdferr)
-  end subroutine h5fort_write_r32_1d
-
-  subroutine h5fort_write_r32_2d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    real(real32), intent(in) :: array(:, :)
-    integer, intent(out) :: hdferr
-
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: ncomp, nlocal, ntotal, local_offset
-    integer(hid_t) :: group_id, xfer_id
-
-    ncomp = int(size(array, 1), int64)
-    nlocal = int(size(array, 2), int64)
-    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
-    if (hdferr /= 0) return
-
-    call write_2d_r32(group_id, "data", array, H5T_NATIVE_REAL, ncomp, nlocal, local_offset, ntotal, xfer_id, hdferr)
-    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
-    call end_parallel_write(group_id, xfer_id, hdferr)
-  end subroutine h5fort_write_r32_2d
-
-  subroutine h5fort_write_r32_3d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    real(real32), intent(in) :: array(:, :, :)
-    integer, intent(out) :: hdferr
-
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: n1, n2, nlocal, ntotal, local_offset
-    integer(hid_t) :: group_id, xfer_id
-
-    n1 = int(size(array, 1), int64)
-    n2 = int(size(array, 2), int64)
-    nlocal = int(size(array, 3), int64)
-    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
-    if (hdferr /= 0) return
-
-    call write_3d_r32(group_id, "data", array, H5T_NATIVE_REAL, n1, n2, nlocal, local_offset, ntotal, xfer_id, hdferr)
-    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
-    call end_parallel_write(group_id, xfer_id, hdferr)
-  end subroutine h5fort_write_r32_3d
-
-  subroutine h5fort_write_r32_4d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    real(real32), intent(in) :: array(:, :, :, :)
-    integer, intent(out) :: hdferr
-
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: n1, n2, n3, nlocal, ntotal, local_offset
-    integer(hid_t) :: group_id, xfer_id
-
-    n1 = int(size(array, 1), int64)
-    n2 = int(size(array, 2), int64)
-    n3 = int(size(array, 3), int64)
-    nlocal = int(size(array, 4), int64)
-    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
-    if (hdferr /= 0) return
-
-    call write_4d_r32(group_id, "data", array, H5T_NATIVE_REAL, n1, n2, n3, nlocal, local_offset, ntotal, xfer_id, hdferr)
-    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
-    call end_parallel_write(group_id, xfer_id, hdferr)
-  end subroutine h5fort_write_r32_4d
-
-  subroutine h5fort_write_i32_0d(file_id, dset_path, scalar, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    integer(int32), intent(in) :: scalar
-    integer, intent(out) :: hdferr
-    integer(int32) :: array(1)
-
-    array(1) = scalar
-    call h5fort_write_i32_1d(file_id, dset_path, array, hdferr)
-  end subroutine h5fort_write_i32_0d
-
-  subroutine h5fort_write_i32_1d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    integer(int32), intent(in) :: array(:)
-    integer, intent(out) :: hdferr
-
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: nlocal, ntotal, local_offset
-    integer(hid_t) :: h5t_i32
-    integer(hid_t) :: group_id, xfer_id
-
-    nlocal = int(size(array, 1), int64)
-    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
-    if (hdferr /= 0) return
-
-    h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
-    call write_1d_i32(group_id, "data", array, h5t_i32, nlocal, local_offset, ntotal, xfer_id, hdferr)
-    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
-    call end_parallel_write(group_id, xfer_id, hdferr)
-  end subroutine h5fort_write_i32_1d
-
-  subroutine h5fort_write_i32_2d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    integer(int32), intent(in) :: array(:, :)
-    integer, intent(out) :: hdferr
-
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: ncomp, nlocal, ntotal, local_offset
-    integer(hid_t) :: h5t_i32
-    integer(hid_t) :: group_id, xfer_id
-
-    ncomp = int(size(array, 1), int64)
-    nlocal = int(size(array, 2), int64)
-    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
-    if (hdferr /= 0) return
-
-    h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
-    call write_2d_i32(group_id, "data", array, h5t_i32, ncomp, nlocal, local_offset, ntotal, xfer_id, hdferr)
-    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
-    call end_parallel_write(group_id, xfer_id, hdferr)
-  end subroutine h5fort_write_i32_2d
-
-  subroutine h5fort_write_i32_3d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    integer(int32), intent(in) :: array(:, :, :)
-    integer, intent(out) :: hdferr
-
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: n1, n2, nlocal, ntotal, local_offset
-    integer(hid_t) :: h5t_i32
-    integer(hid_t) :: group_id, xfer_id
-
-    n1 = int(size(array, 1), int64)
-    n2 = int(size(array, 2), int64)
-    nlocal = int(size(array, 3), int64)
-    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
-    if (hdferr /= 0) return
-
-    h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
-    call write_3d_i32(group_id, "data", array, h5t_i32, n1, n2, nlocal, local_offset, ntotal, xfer_id, hdferr)
-    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
-    call end_parallel_write(group_id, xfer_id, hdferr)
-  end subroutine h5fort_write_i32_3d
-
-  subroutine h5fort_write_i32_4d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    integer(int32), intent(in) :: array(:, :, :, :)
-    integer, intent(out) :: hdferr
-
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: n1, n2, n3, nlocal, ntotal, local_offset
-    integer(hid_t) :: h5t_i32
-    integer(hid_t) :: group_id, xfer_id
-
-    n1 = int(size(array, 1), int64)
-    n2 = int(size(array, 2), int64)
-    n3 = int(size(array, 3), int64)
-    nlocal = int(size(array, 4), int64)
-    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
-    if (hdferr /= 0) return
-
-    h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
-    call write_4d_i32(group_id, "data", array, h5t_i32, n1, n2, n3, nlocal, local_offset, ntotal, xfer_id, hdferr)
-    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
-    call end_parallel_write(group_id, xfer_id, hdferr)
-  end subroutine h5fort_write_i32_4d
-
-  subroutine h5fort_write_lgc_0d(file_id, dset_path, scalar, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    logical, intent(in) :: scalar
-    integer, intent(out) :: hdferr
-    integer(int32) :: ival
-
-    ival = merge(1_int32, 0_int32, scalar)
-    call h5fort_write_i32_0d(file_id, dset_path, ival, hdferr)
-  end subroutine h5fort_write_lgc_0d
-
-  subroutine h5fort_write_str_0d(file_id, dset_path, str, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    character(len=*), intent(in) :: str
-    integer, intent(out) :: hdferr
-
-    write(error_unit, '(a,a)') "[h5fort/parallel/write] ERROR: parallel string write is not implemented: ", trim(dset_path)
-    hdferr = -1
-  end subroutine h5fort_write_str_0d
-
-
-  subroutine h5fort_write_lgc_1d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    logical, intent(in) :: array(:)
-    integer, intent(out) :: hdferr
-    integer(int32), allocatable :: iarray(:)
-
-    allocate(iarray(size(array, 1)))
-    iarray = merge(1_int32, 0_int32, array)
-    call h5fort_write_i32_1d(file_id, dset_path, iarray, hdferr)
-  end subroutine h5fort_write_lgc_1d
-
-  subroutine h5fort_write_lgc_2d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    logical, intent(in) :: array(:, :)
-    integer, intent(out) :: hdferr
-    integer(int32), allocatable :: iarray(:, :)
-
-    allocate(iarray(size(array, 1), size(array, 2)))
-    iarray = merge(1_int32, 0_int32, array)
-    call h5fort_write_i32_2d(file_id, dset_path, iarray, hdferr)
-  end subroutine h5fort_write_lgc_2d
-
-  subroutine h5fort_write_lgc_3d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    logical, intent(in) :: array(:, :, :)
-    integer, intent(out) :: hdferr
-    integer(int32), allocatable :: iarray(:, :, :)
-
-    allocate(iarray(size(array, 1), size(array, 2), size(array, 3)))
-    iarray = merge(1_int32, 0_int32, array)
-    call h5fort_write_i32_3d(file_id, dset_path, iarray, hdferr)
-  end subroutine h5fort_write_lgc_3d
-
-  subroutine h5fort_write_lgc_4d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    logical, intent(in) :: array(:, :, :, :)
-    integer, intent(out) :: hdferr
-    integer(int32), allocatable :: iarray(:, :, :, :)
-
-    allocate(iarray(size(array, 1), size(array, 2), size(array, 3), size(array, 4)))
-    iarray = merge(1_int32, 0_int32, array)
-    call h5fort_write_i32_4d(file_id, dset_path, iarray, hdferr)
-  end subroutine h5fort_write_lgc_4d
-
   subroutine write_1d_r64(group_id, dname, array, h5type, nlocal, off, ntotal, xfer_id, hdferr)
     integer(hid_t), intent(in) :: group_id, h5type, xfer_id
     character(len=*), intent(in) :: dname
@@ -498,7 +143,7 @@ contains
     integer(int64), intent(in) :: nlocal, off, ntotal
     integer, intent(out) :: hdferr
     integer(hid_t) :: fsid, msid, did
-    integer(hsize_t) :: dims_f(1), dims_m(1), hstart(1), hcount(1)
+    integer(hsize_t) :: dims_f(1), dims_m(1)
     integer :: err_local
 
     dims_f = [int(ntotal, hsize_t)]
@@ -579,7 +224,8 @@ contains
     integer(hid_t), intent(in) :: group_id, h5type, xfer_id
     character(len=*), intent(in) :: dname
     real(real64), intent(in) :: array(:, :)
-    integer(int64), intent(in) :: ncomp, nlocal, off, ntotal
+    integer(int64), intent(in) :: ncomp
+    integer(int64), intent(in) :: nlocal, off, ntotal
     integer, intent(out) :: hdferr
     integer(hid_t) :: fsid, msid, did
     integer(hsize_t) :: dims_f(2), dims_m(2)
@@ -607,7 +253,8 @@ contains
     integer(hid_t), intent(in) :: group_id, h5type, xfer_id
     character(len=*), intent(in) :: dname
     real(real32), intent(in) :: array(:, :)
-    integer(int64), intent(in) :: ncomp, nlocal, off, ntotal
+    integer(int64), intent(in) :: ncomp
+    integer(int64), intent(in) :: nlocal, off, ntotal
     integer, intent(out) :: hdferr
     integer(hid_t) :: fsid, msid, did
     integer(hsize_t) :: dims_f(2), dims_m(2)
@@ -635,7 +282,8 @@ contains
     integer(hid_t), intent(in) :: group_id, h5type, xfer_id
     character(len=*), intent(in) :: dname
     integer(int32), intent(in) :: array(:, :)
-    integer(int64), intent(in) :: ncomp, nlocal, off, ntotal
+    integer(int64), intent(in) :: ncomp
+    integer(int64), intent(in) :: nlocal, off, ntotal
     integer, intent(out) :: hdferr
     integer(hid_t) :: fsid, msid, did
     integer(hsize_t) :: dims_f(2), dims_m(2)
@@ -663,7 +311,9 @@ contains
     integer(hid_t), intent(in) :: group_id, h5type, xfer_id
     character(len=*), intent(in) :: dname
     real(real64), intent(in) :: array(:, :, :)
-    integer(int64), intent(in) :: n1, n2, nlocal, off, ntotal
+    integer(int64), intent(in) :: n1
+    integer(int64), intent(in) :: n2
+    integer(int64), intent(in) :: nlocal, off, ntotal
     integer, intent(out) :: hdferr
     integer(hid_t) :: fsid, msid, did
     integer(hsize_t) :: dims_f(3), dims_m(3)
@@ -691,7 +341,9 @@ contains
     integer(hid_t), intent(in) :: group_id, h5type, xfer_id
     character(len=*), intent(in) :: dname
     real(real32), intent(in) :: array(:, :, :)
-    integer(int64), intent(in) :: n1, n2, nlocal, off, ntotal
+    integer(int64), intent(in) :: n1
+    integer(int64), intent(in) :: n2
+    integer(int64), intent(in) :: nlocal, off, ntotal
     integer, intent(out) :: hdferr
     integer(hid_t) :: fsid, msid, did
     integer(hsize_t) :: dims_f(3), dims_m(3)
@@ -719,7 +371,9 @@ contains
     integer(hid_t), intent(in) :: group_id, h5type, xfer_id
     character(len=*), intent(in) :: dname
     integer(int32), intent(in) :: array(:, :, :)
-    integer(int64), intent(in) :: n1, n2, nlocal, off, ntotal
+    integer(int64), intent(in) :: n1
+    integer(int64), intent(in) :: n2
+    integer(int64), intent(in) :: nlocal, off, ntotal
     integer, intent(out) :: hdferr
     integer(hid_t) :: fsid, msid, did
     integer(hsize_t) :: dims_f(3), dims_m(3)
@@ -747,7 +401,10 @@ contains
     integer(hid_t), intent(in) :: group_id, h5type, xfer_id
     character(len=*), intent(in) :: dname
     real(real64), intent(in) :: array(:, :, :, :)
-    integer(int64), intent(in) :: n1, n2, n3, nlocal, off, ntotal
+    integer(int64), intent(in) :: n1
+    integer(int64), intent(in) :: n2
+    integer(int64), intent(in) :: n3
+    integer(int64), intent(in) :: nlocal, off, ntotal
     integer, intent(out) :: hdferr
     integer(hid_t) :: fsid, msid, did
     integer(hsize_t) :: dims_f(4), dims_m(4)
@@ -775,7 +432,10 @@ contains
     integer(hid_t), intent(in) :: group_id, h5type, xfer_id
     character(len=*), intent(in) :: dname
     real(real32), intent(in) :: array(:, :, :, :)
-    integer(int64), intent(in) :: n1, n2, n3, nlocal, off, ntotal
+    integer(int64), intent(in) :: n1
+    integer(int64), intent(in) :: n2
+    integer(int64), intent(in) :: n3
+    integer(int64), intent(in) :: nlocal, off, ntotal
     integer, intent(out) :: hdferr
     integer(hid_t) :: fsid, msid, did
     integer(hsize_t) :: dims_f(4), dims_m(4)
@@ -803,7 +463,10 @@ contains
     integer(hid_t), intent(in) :: group_id, h5type, xfer_id
     character(len=*), intent(in) :: dname
     integer(int32), intent(in) :: array(:, :, :, :)
-    integer(int64), intent(in) :: n1, n2, n3, nlocal, off, ntotal
+    integer(int64), intent(in) :: n1
+    integer(int64), intent(in) :: n2
+    integer(int64), intent(in) :: n3
+    integer(int64), intent(in) :: nlocal, off, ntotal
     integer, intent(out) :: hdferr
     integer(hid_t) :: fsid, msid, did
     integer(hsize_t) :: dims_f(4), dims_m(4)
@@ -826,6 +489,381 @@ contains
     call h5sclose_f(msid, err_local)
     if (hdferr == 0) hdferr = err_local
   end subroutine write_4d_i32
+
+
+  !============================================================================
+  ! h5fort_write_{kname}_0d — scalar (1D に委譲)
+  !============================================================================
+  subroutine h5fort_write_r64_0d(file_id, dset_path, scalar, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    real(real64), intent(in) :: scalar
+    integer, intent(out) :: hdferr
+    real(real64) :: tmp(1)
+    tmp(1) = scalar
+    call h5fort_write_r64_1d(file_id, dset_path, tmp, hdferr)
+  end subroutine h5fort_write_r64_0d
+
+  subroutine h5fort_write_r32_0d(file_id, dset_path, scalar, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    real(real32), intent(in) :: scalar
+    integer, intent(out) :: hdferr
+    real(real32) :: tmp(1)
+    tmp(1) = scalar
+    call h5fort_write_r32_1d(file_id, dset_path, tmp, hdferr)
+  end subroutine h5fort_write_r32_0d
+
+  subroutine h5fort_write_i32_0d(file_id, dset_path, scalar, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    integer(int32), intent(in) :: scalar
+    integer, intent(out) :: hdferr
+    integer(int32) :: tmp(1)
+    tmp(1) = scalar
+    call h5fort_write_i32_1d(file_id, dset_path, tmp, hdferr)
+  end subroutine h5fort_write_i32_0d
+
+
+  !============================================================================
+  ! h5fort_write_{kname}_{rank}d — 1D–4D
+  !============================================================================
+  subroutine h5fort_write_r64_1d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    real(real64), intent(in) :: array(:)
+    integer, intent(out) :: hdferr
+
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: nlocal, ntotal, local_offset
+    integer(hid_t) :: group_id, xfer_id
+
+    nlocal = int(size(array, 1), int64)
+    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    call write_1d_r64(group_id, "data", array, H5T_NATIVE_DOUBLE, nlocal, local_offset, ntotal, xfer_id, hdferr)
+    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
+    call end_parallel_write(group_id, xfer_id, hdferr)
+  end subroutine h5fort_write_r64_1d
+
+  subroutine h5fort_write_r64_2d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    real(real64), intent(in) :: array(:, :)
+    integer, intent(out) :: hdferr
+
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: ncomp
+    integer(int64) :: nlocal, ntotal, local_offset
+    integer(hid_t) :: group_id, xfer_id
+
+    ncomp = int(size(array, 1), int64)
+    nlocal = int(size(array, 2), int64)
+    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    call write_2d_r64(group_id, "data", array, H5T_NATIVE_DOUBLE, ncomp, nlocal, local_offset, ntotal, xfer_id, hdferr)
+    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
+    call end_parallel_write(group_id, xfer_id, hdferr)
+  end subroutine h5fort_write_r64_2d
+
+  subroutine h5fort_write_r64_3d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    real(real64), intent(in) :: array(:, :, :)
+    integer, intent(out) :: hdferr
+
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: n1
+    integer(int64) :: n2
+    integer(int64) :: nlocal, ntotal, local_offset
+    integer(hid_t) :: group_id, xfer_id
+
+    n1 = int(size(array, 1), int64)
+    n2 = int(size(array, 2), int64)
+    nlocal = int(size(array, 3), int64)
+    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    call write_3d_r64(group_id, "data", array, H5T_NATIVE_DOUBLE, n1, n2, nlocal, local_offset, ntotal, xfer_id, hdferr)
+    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
+    call end_parallel_write(group_id, xfer_id, hdferr)
+  end subroutine h5fort_write_r64_3d
+
+  subroutine h5fort_write_r64_4d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    real(real64), intent(in) :: array(:, :, :, :)
+    integer, intent(out) :: hdferr
+
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: n1
+    integer(int64) :: n2
+    integer(int64) :: n3
+    integer(int64) :: nlocal, ntotal, local_offset
+    integer(hid_t) :: group_id, xfer_id
+
+    n1 = int(size(array, 1), int64)
+    n2 = int(size(array, 2), int64)
+    n3 = int(size(array, 3), int64)
+    nlocal = int(size(array, 4), int64)
+    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    call write_4d_r64(group_id, "data", array, H5T_NATIVE_DOUBLE, n1, n2, n3, nlocal, local_offset, ntotal, xfer_id, hdferr)
+    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
+    call end_parallel_write(group_id, xfer_id, hdferr)
+  end subroutine h5fort_write_r64_4d
+
+  subroutine h5fort_write_r32_1d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    real(real32), intent(in) :: array(:)
+    integer, intent(out) :: hdferr
+
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: nlocal, ntotal, local_offset
+    integer(hid_t) :: group_id, xfer_id
+
+    nlocal = int(size(array, 1), int64)
+    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    call write_1d_r32(group_id, "data", array, H5T_NATIVE_REAL, nlocal, local_offset, ntotal, xfer_id, hdferr)
+    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
+    call end_parallel_write(group_id, xfer_id, hdferr)
+  end subroutine h5fort_write_r32_1d
+
+  subroutine h5fort_write_r32_2d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    real(real32), intent(in) :: array(:, :)
+    integer, intent(out) :: hdferr
+
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: ncomp
+    integer(int64) :: nlocal, ntotal, local_offset
+    integer(hid_t) :: group_id, xfer_id
+
+    ncomp = int(size(array, 1), int64)
+    nlocal = int(size(array, 2), int64)
+    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    call write_2d_r32(group_id, "data", array, H5T_NATIVE_REAL, ncomp, nlocal, local_offset, ntotal, xfer_id, hdferr)
+    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
+    call end_parallel_write(group_id, xfer_id, hdferr)
+  end subroutine h5fort_write_r32_2d
+
+  subroutine h5fort_write_r32_3d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    real(real32), intent(in) :: array(:, :, :)
+    integer, intent(out) :: hdferr
+
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: n1
+    integer(int64) :: n2
+    integer(int64) :: nlocal, ntotal, local_offset
+    integer(hid_t) :: group_id, xfer_id
+
+    n1 = int(size(array, 1), int64)
+    n2 = int(size(array, 2), int64)
+    nlocal = int(size(array, 3), int64)
+    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    call write_3d_r32(group_id, "data", array, H5T_NATIVE_REAL, n1, n2, nlocal, local_offset, ntotal, xfer_id, hdferr)
+    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
+    call end_parallel_write(group_id, xfer_id, hdferr)
+  end subroutine h5fort_write_r32_3d
+
+  subroutine h5fort_write_r32_4d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    real(real32), intent(in) :: array(:, :, :, :)
+    integer, intent(out) :: hdferr
+
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: n1
+    integer(int64) :: n2
+    integer(int64) :: n3
+    integer(int64) :: nlocal, ntotal, local_offset
+    integer(hid_t) :: group_id, xfer_id
+
+    n1 = int(size(array, 1), int64)
+    n2 = int(size(array, 2), int64)
+    n3 = int(size(array, 3), int64)
+    nlocal = int(size(array, 4), int64)
+    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    call write_4d_r32(group_id, "data", array, H5T_NATIVE_REAL, n1, n2, n3, nlocal, local_offset, ntotal, xfer_id, hdferr)
+    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
+    call end_parallel_write(group_id, xfer_id, hdferr)
+  end subroutine h5fort_write_r32_4d
+
+  subroutine h5fort_write_i32_1d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    integer(int32), intent(in) :: array(:)
+    integer, intent(out) :: hdferr
+
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: nlocal, ntotal, local_offset
+    integer(hid_t) :: group_id, xfer_id
+    integer(hid_t) :: h5t_i32
+
+    nlocal = int(size(array, 1), int64)
+    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
+    call write_1d_i32(group_id, "data", array, h5t_i32, nlocal, local_offset, ntotal, xfer_id, hdferr)
+    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
+    call end_parallel_write(group_id, xfer_id, hdferr)
+  end subroutine h5fort_write_i32_1d
+
+  subroutine h5fort_write_i32_2d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    integer(int32), intent(in) :: array(:, :)
+    integer, intent(out) :: hdferr
+
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: ncomp
+    integer(int64) :: nlocal, ntotal, local_offset
+    integer(hid_t) :: group_id, xfer_id
+    integer(hid_t) :: h5t_i32
+
+    ncomp = int(size(array, 1), int64)
+    nlocal = int(size(array, 2), int64)
+    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
+    call write_2d_i32(group_id, "data", array, h5t_i32, ncomp, nlocal, local_offset, ntotal, xfer_id, hdferr)
+    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
+    call end_parallel_write(group_id, xfer_id, hdferr)
+  end subroutine h5fort_write_i32_2d
+
+  subroutine h5fort_write_i32_3d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    integer(int32), intent(in) :: array(:, :, :)
+    integer, intent(out) :: hdferr
+
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: n1
+    integer(int64) :: n2
+    integer(int64) :: nlocal, ntotal, local_offset
+    integer(hid_t) :: group_id, xfer_id
+    integer(hid_t) :: h5t_i32
+
+    n1 = int(size(array, 1), int64)
+    n2 = int(size(array, 2), int64)
+    nlocal = int(size(array, 3), int64)
+    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
+    call write_3d_i32(group_id, "data", array, h5t_i32, n1, n2, nlocal, local_offset, ntotal, xfer_id, hdferr)
+    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
+    call end_parallel_write(group_id, xfer_id, hdferr)
+  end subroutine h5fort_write_i32_3d
+
+  subroutine h5fort_write_i32_4d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    integer(int32), intent(in) :: array(:, :, :, :)
+    integer, intent(out) :: hdferr
+
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: n1
+    integer(int64) :: n2
+    integer(int64) :: n3
+    integer(int64) :: nlocal, ntotal, local_offset
+    integer(hid_t) :: group_id, xfer_id
+    integer(hid_t) :: h5t_i32
+
+    n1 = int(size(array, 1), int64)
+    n2 = int(size(array, 2), int64)
+    n3 = int(size(array, 3), int64)
+    nlocal = int(size(array, 4), int64)
+    call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
+    call write_4d_i32(group_id, "data", array, h5t_i32, n1, n2, n3, nlocal, local_offset, ntotal, xfer_id, hdferr)
+    if (hdferr == 0) call write_partition(group_id, count_, offset_, xfer_id, hdferr)
+    call end_parallel_write(group_id, xfer_id, hdferr)
+  end subroutine h5fort_write_i32_4d
+
+
+  !============================================================================
+  ! h5fort_write_str_0d — parallel では未実装
+  !============================================================================
+  subroutine h5fort_write_str_0d(file_id, dset_path, str, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    character(len=*), intent(in) :: str
+    integer, intent(out) :: hdferr
+
+    write(error_unit, '(a,a)') "[h5fort/parallel/write] ERROR: parallel string write is not implemented: ", trim(dset_path)
+    hdferr = -1
+  end subroutine h5fort_write_str_0d
+
+  !============================================================================
+  ! h5fort_write_lgc_{rank}d — logical (int32 として保存)
+  !============================================================================
+  subroutine h5fort_write_lgc_0d(file_id, dset_path, scalar, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    logical, intent(in) :: scalar
+    integer, intent(out) :: hdferr
+    integer(int32) :: ival
+
+    ival = merge(1_int32, 0_int32, scalar)
+    call h5fort_write_i32_0d(file_id, dset_path, ival, hdferr)
+  end subroutine h5fort_write_lgc_0d
+
+  subroutine h5fort_write_lgc_1d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    logical, intent(in) :: array(:)
+    integer, intent(out) :: hdferr
+    integer(int32), allocatable :: iarray(:)
+
+    allocate(iarray(size(array,1)))
+    iarray = merge(1_int32, 0_int32, array)
+    call h5fort_write_i32_1d(file_id, dset_path, iarray, hdferr)
+  end subroutine h5fort_write_lgc_1d
+
+  subroutine h5fort_write_lgc_2d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    logical, intent(in) :: array(:, :)
+    integer, intent(out) :: hdferr
+    integer(int32), allocatable :: iarray(:, :)
+
+    allocate(iarray(size(array,1), size(array,2)))
+    iarray = merge(1_int32, 0_int32, array)
+    call h5fort_write_i32_2d(file_id, dset_path, iarray, hdferr)
+  end subroutine h5fort_write_lgc_2d
+
+  subroutine h5fort_write_lgc_3d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    logical, intent(in) :: array(:, :, :)
+    integer, intent(out) :: hdferr
+    integer(int32), allocatable :: iarray(:, :, :)
+
+    allocate(iarray(size(array,1), size(array,2), size(array,3)))
+    iarray = merge(1_int32, 0_int32, array)
+    call h5fort_write_i32_3d(file_id, dset_path, iarray, hdferr)
+  end subroutine h5fort_write_lgc_3d
+
+  subroutine h5fort_write_lgc_4d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    logical, intent(in) :: array(:, :, :, :)
+    integer, intent(out) :: hdferr
+    integer(int32), allocatable :: iarray(:, :, :, :)
+
+    allocate(iarray(size(array,1), size(array,2), size(array,3), size(array,4)))
+    iarray = merge(1_int32, 0_int32, array)
+    call h5fort_write_i32_4d(file_id, dset_path, iarray, hdferr)
+  end subroutine h5fort_write_lgc_4d
+
 
   !============================================================================
   ! Helper subroutines for selecting hyperslabs and creating memory spaces.

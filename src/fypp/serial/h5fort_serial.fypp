@@ -1,0 +1,306 @@
+! DO NOT EDIT — generated from src/fypp/serial/h5fort_serial.fypp
+! To regenerate: scripts/generate_fypp.sh
+#:include "common.fypp"
+#!
+#! Build lists of all procedure names for the generic statements
+#!
+#:set WRITE_PROCS = []
+#:for kname, ftype, h5type in KINDS
+  #:set WRITE_PROCS = WRITE_PROCS + ['write_' + kname + '_0d']
+  #:for rank in RANKS
+    #:set WRITE_PROCS = WRITE_PROCS + ['write_' + kname + '_' + str(rank) + 'd']
+  #:endfor
+#:endfor
+#:set WRITE_PROCS = WRITE_PROCS + ['write_str_0d', 'write_lgc_0d']
+#:for rank in RANKS
+  #:set WRITE_PROCS = WRITE_PROCS + ['write_lgc_' + str(rank) + 'd']
+#:endfor
+#!
+#:set READ_PROCS = []
+#:for kname, ftype, h5type in KINDS
+  #:set READ_PROCS = READ_PROCS + ['read_' + kname + '_0d']
+  #:for rank in RANKS
+    #:set READ_PROCS = READ_PROCS + ['read_' + kname + '_' + str(rank) + 'd']
+  #:endfor
+#:endfor
+#:set READ_PROCS = READ_PROCS + ['read_str_0d', 'read_lgc_0d']
+#:for rank in RANKS
+  #:set READ_PROCS = READ_PROCS + ['read_lgc_' + str(rank) + 'd']
+#:endfor
+#!
+#:set FIXED_PROCS = []
+#:for kname, ftype, h5type in KINDS
+  #:for rank in RANKS
+    #:set FIXED_PROCS = FIXED_PROCS + ['read_' + kname + '_' + str(rank) + 'd_fixed']
+  #:endfor
+#:endfor
+!==============================================================================
+! Module: h5fort_serial_write
+!
+! 概要:
+!   HDF5ファイルへのデータセット読み書きを行う汎用手続きを提供するモジュール。
+!   中間グループはhdf5_writeが自動生成する。
+!
+!   対応する配列ランク: scalar, 1D, 2D, 3D, 4D (allocatable および固定長)
+!   対応する型        : real(real64), real(real32), integer(int32), logical (int32で保存), character (スカラーのみ)
+!   属性の書き込み   : hdf5_write_attr(file_id, path, [t_hdf5_attr("name","val"), ...], hdferr)
+!                      hdf5_write の attrs=[ ... ] optional 引数でも同時指定可
+!                      hdf5_write の units="..." optional 引数で単位を直接指定可
+!
+! 使用例 (OOP):
+!   type(t_h5fort_serial) :: h5
+!   h5%f_name = "output.h5"
+!   call h5%open(mode=H5FORTRAN_FORCE_WRITE)
+!   call h5%write("/dataset", data)
+!   call h5%close()
+!
+! 依存:
+!   HDF5 Fortran API (hdf5モジュール), iso_fortran_env
+!==============================================================================
+module h5fort_serial
+  use h5fort_serial_write
+  use h5fort_serial_read
+  use h5fort_serial_read_fixed
+  use hdf5
+  use, intrinsic :: iso_fortran_env
+  implicit none
+  private
+
+  public :: h5fort_swrite
+  public :: h5fort_sread
+  public :: h5fort_sread_fixed
+  public :: h5fort_swrite_attr
+
+  public :: t_hdf5_attr
+  public :: t_h5fort_serial
+
+  public :: H5FORTRAN_FORCE_WRITE
+
+  interface h5fort_swrite
+#:for kname, ftype, h5type in KINDS
+    module procedure h5fort_write_${kname}$_0d, ${', '.join(['h5fort_write_' + kname + '_' + str(r) + 'd' for r in RANKS])}$
+#:endfor
+    module procedure h5fort_write_str_0d
+    module procedure h5fort_write_lgc_0d, ${', '.join(['h5fort_write_lgc_' + str(r) + 'd' for r in RANKS])}$
+  end interface h5fort_swrite
+
+  interface h5fort_sread
+#:for kname, ftype, h5type in KINDS
+    module procedure h5fort_read_${kname}$_0d, ${', '.join(['h5fort_read_' + kname + '_' + str(r) + 'd' for r in RANKS])}$
+#:endfor
+    module procedure h5fort_read_str_0d
+    module procedure h5fort_read_lgc_0d, ${', '.join(['h5fort_read_lgc_' + str(r) + 'd' for r in RANKS])}$
+  end interface h5fort_sread
+
+  interface h5fort_sread_fixed
+#:for kname, ftype, h5type in KINDS
+    module procedure ${', '.join(['h5fort_read_' + kname + '_' + str(r) + 'd_fixed' for r in RANKS])}$
+#:endfor
+  end interface h5fort_sread_fixed
+
+  type :: t_h5fort_serial
+    character(len=:), allocatable :: f_name
+    integer(hid_t) :: file_id = -1
+    integer :: hdferr
+  contains
+    procedure :: open  => h5fort_serial_open
+    procedure :: close => h5fort_serial_close
+    ! write PASS wrappers
+#:for kname, ftype, h5type in KINDS
+    procedure, private :: write_${kname}$_0d => h5fort_serial_write_${kname}$_0d
+    #:for rank in RANKS
+    procedure, private :: write_${kname}$_${rank}$d => h5fort_serial_write_${kname}$_${rank}$d
+    #:endfor
+#:endfor
+    procedure, private :: write_str_0d => h5fort_serial_write_str_0d
+    procedure, private :: write_lgc_0d => h5fort_serial_write_lgc_0d
+#:for rank in RANKS
+    procedure, private :: write_lgc_${rank}$d => h5fort_serial_write_lgc_${rank}$d
+#:endfor
+    generic, public :: write => &
+      ${', &\n      '.join(WRITE_PROCS)}$
+    ! read PASS wrappers
+#:for kname, ftype, h5type in KINDS
+    procedure, private :: read_${kname}$_0d => h5fort_serial_read_${kname}$_0d
+    #:for rank in RANKS
+    procedure, private :: read_${kname}$_${rank}$d => h5fort_serial_read_${kname}$_${rank}$d
+    #:endfor
+#:endfor
+    procedure, private :: read_str_0d => h5fort_serial_read_str_0d
+    procedure, private :: read_lgc_0d => h5fort_serial_read_lgc_0d
+#:for rank in RANKS
+    procedure, private :: read_lgc_${rank}$d => h5fort_serial_read_lgc_${rank}$d
+#:endfor
+    generic, public :: read => &
+      ${', &\n      '.join(READ_PROCS)}$
+    ! read_fixed PASS wrappers
+#:for kname, ftype, h5type in KINDS
+    #:for rank in RANKS
+    procedure, private :: read_${kname}$_${rank}$d_fixed => h5fort_serial_read_${kname}$_${rank}$d_fixed
+    #:endfor
+#:endfor
+    generic, public :: read_fixed => &
+      ${', &\n      '.join(FIXED_PROCS)}$
+  end type t_h5fort_serial
+
+
+contains
+
+  !============================================================================
+  ! open: ファイルを開く
+  !   mode=H5FORTRAN_FORCE_WRITE → 新規作成（既存ファイルは上書き）
+  !   mode 省略                  → 既存ファイルを読み書きモードで開く
+  !============================================================================
+  subroutine h5fort_serial_open(self, mode)
+    class(t_h5fort_serial), intent(inout) :: self
+    integer, intent(in), optional :: mode
+    integer :: mode_
+    mode_ = 0
+    if (present(mode)) mode_ = mode
+    call h5open_f(self%hdferr)
+    if (self%hdferr /= 0) return
+    if (mode_ == H5FORTRAN_FORCE_WRITE) then
+      call h5fcreate_f(self%f_name, H5F_ACC_TRUNC_F, self%file_id, self%hdferr)
+    else
+      call h5fopen_f(self%f_name, H5F_ACC_RDWR_F, self%file_id, self%hdferr)
+    end if
+  end subroutine h5fort_serial_open
+
+  !============================================================================
+  ! close: ファイルを閉じる
+  !============================================================================
+  subroutine h5fort_serial_close(self)
+    class(t_h5fort_serial), intent(inout) :: self
+    call h5fclose_f(self%file_id, self%hdferr)
+    call h5close_f(self%hdferr)
+  end subroutine h5fort_serial_close
+
+  !============================================================================
+  ! write PASS wrappers — real64 / real32 / int32 scalars and arrays
+  !============================================================================
+#:for kname, ftype, h5type in KINDS
+  subroutine h5fort_serial_write_${kname}$_0d(self, dset_path, scalar, mode, attrs, units)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*),  intent(in) :: dset_path
+    ${ftype}$,         intent(in) :: scalar
+    integer,           intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+    call h5fort_write_${kname}$_0d(self%file_id, dset_path, scalar, self%hdferr, mode, attrs, units)
+  end subroutine h5fort_serial_write_${kname}$_0d
+
+  #:for rank in RANKS
+  subroutine h5fort_serial_write_${kname}$_${rank}$d(self, dset_path, array, mode, attrs, units)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*),  intent(in) :: dset_path
+    ${ftype}$,         intent(in) :: array(${', '.join([':']*rank)}$)
+    integer,           intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+    call h5fort_write_${kname}$_${rank}$d(self%file_id, dset_path, array, self%hdferr, mode, attrs, units)
+  end subroutine h5fort_serial_write_${kname}$_${rank}$d
+
+  #:endfor
+#:endfor
+
+  !============================================================================
+  ! write PASS wrappers — character and logical
+  !============================================================================
+  subroutine h5fort_serial_write_str_0d(self, dset_path, str, mode, attrs, units)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*),  intent(in) :: dset_path
+    character(len=*),  intent(in) :: str
+    integer,           intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+    call h5fort_write_str_0d(self%file_id, dset_path, str, self%hdferr, mode, attrs, units)
+  end subroutine h5fort_serial_write_str_0d
+
+  subroutine h5fort_serial_write_lgc_0d(self, dset_path, scalar, mode, attrs, units)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*),  intent(in) :: dset_path
+    logical,           intent(in) :: scalar
+    integer,           intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+    call h5fort_write_lgc_0d(self%file_id, dset_path, scalar, self%hdferr, mode, attrs, units)
+  end subroutine h5fort_serial_write_lgc_0d
+
+#:for rank in RANKS
+  subroutine h5fort_serial_write_lgc_${rank}$d(self, dset_path, array, mode, attrs, units)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*),  intent(in) :: dset_path
+    logical,           intent(in) :: array(${', '.join([':']*rank)}$)
+    integer,           intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+    call h5fort_write_lgc_${rank}$d(self%file_id, dset_path, array, self%hdferr, mode, attrs, units)
+  end subroutine h5fort_serial_write_lgc_${rank}$d
+
+#:endfor
+
+  !============================================================================
+  ! read PASS wrappers — real64 / real32 / int32 scalars and arrays
+  !============================================================================
+#:for kname, ftype, h5type in KINDS
+  subroutine h5fort_serial_read_${kname}$_0d(self, dset_path, scalar)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*), intent(in)  :: dset_path
+    ${ftype}$,        intent(out) :: scalar
+    call h5fort_read_${kname}$_0d(self%file_id, dset_path, scalar, self%hdferr)
+  end subroutine h5fort_serial_read_${kname}$_0d
+
+  #:for rank in RANKS
+  subroutine h5fort_serial_read_${kname}$_${rank}$d(self, dset_path, array)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*), intent(in)  :: dset_path
+    ${ftype}$, allocatable, intent(out) :: array(${', '.join([':']*rank)}$)
+    call h5fort_read_${kname}$_${rank}$d(self%file_id, dset_path, array, self%hdferr)
+  end subroutine h5fort_serial_read_${kname}$_${rank}$d
+
+  #:endfor
+#:endfor
+
+  !============================================================================
+  ! read PASS wrappers — character and logical
+  !============================================================================
+  subroutine h5fort_serial_read_str_0d(self, dset_path, str)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*),              intent(in)  :: dset_path
+    character(len=:), allocatable, intent(out) :: str
+    call h5fort_read_str_0d(self%file_id, dset_path, str, self%hdferr)
+  end subroutine h5fort_serial_read_str_0d
+
+  subroutine h5fort_serial_read_lgc_0d(self, dset_path, scalar)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*), intent(in)  :: dset_path
+    logical,          intent(out) :: scalar
+    call h5fort_read_lgc_0d(self%file_id, dset_path, scalar, self%hdferr)
+  end subroutine h5fort_serial_read_lgc_0d
+
+#:for rank in RANKS
+  subroutine h5fort_serial_read_lgc_${rank}$d(self, dset_path, array)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*),     intent(in)  :: dset_path
+    logical, allocatable, intent(out) :: array(${', '.join([':']*rank)}$)
+    call h5fort_read_lgc_${rank}$d(self%file_id, dset_path, array, self%hdferr)
+  end subroutine h5fort_serial_read_lgc_${rank}$d
+
+#:endfor
+
+  !============================================================================
+  ! read_fixed PASS wrappers — real64 / real32 / int32 (1D–4D)
+  !============================================================================
+#:for kname, ftype, h5type in KINDS
+  #:for rank in RANKS
+  subroutine h5fort_serial_read_${kname}$_${rank}$d_fixed(self, dset_path, array)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*), intent(in)  :: dset_path
+    ${ftype}$,        intent(out) :: array(${', '.join([':']*rank)}$)
+    call h5fort_read_${kname}$_${rank}$d_fixed(self%file_id, dset_path, array, self%hdferr)
+  end subroutine h5fort_serial_read_${kname}$_${rank}$d_fixed
+
+  #:endfor
+#:endfor
+
+end module h5fort_serial

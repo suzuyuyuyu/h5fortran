@@ -44,3 +44,19 @@ target_include_directories(h5fortran PUBLIC
 set_target_properties(h5fortran PROPERTIES
   Fortran_PREPROCESS ON
   Fortran_MODULE_DIRECTORY "${H5FORTRAN_MODULE_DIRECTORY}")
+
+include(GNUInstallDirs)
+
+install(TARGETS h5fortran h5fortran_serial h5fortran_parallel
+  EXPORT h5fortranTargets
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+install(DIRECTORY "${H5FORTRAN_MODULE_DIRECTORY}/"
+  DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/h5fortran"
+  FILES_MATCHING PATTERN "*.mod")
+
+install(EXPORT h5fortranTargets
+  FILE h5fortranTargets.cmake
+  NAMESPACE h5fortran::
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/h5fortran")

@@ -1,3 +1,5 @@
+! DO NOT EDIT — generated from src/fypp/parallel/h5fort_parallel_read.fypp
+! To regenerate: scripts/generate_fypp.sh
 #include "h5fort_config.inc"
 #include "h5fort_parallel.inc"
 module h5fort_parallel_read
@@ -13,7 +15,7 @@ module h5fort_parallel_read
   public :: h5fort_read_str_0d
   public :: h5fort_read_lgc_0d, h5fort_read_lgc_1d, h5fort_read_lgc_2d, h5fort_read_lgc_3d, h5fort_read_lgc_4d
 
-  character(len=*), parameter :: COUNT_DATASET_NAME = H5FORT_DSET_COUNT_DNAME
+  character(len=*), parameter :: COUNT_DATASET_NAME  = H5FORT_DSET_COUNT_DNAME
   character(len=*), parameter :: OFFSET_DATASET_NAME = H5FORT_DSET_OFFSET_DNAME
 
 contains
@@ -28,10 +30,10 @@ contains
 
     integer :: me, nprocs, mpi_err
 
-    data_id = -1_hid_t
+    data_id       = -1_hid_t
     file_space_id = -1_hid_t
-    xfer_id = -1_hid_t
-    hdferr = 0
+    xfer_id       = -1_hid_t
+    hdferr        = 0
 
     call MPI_Comm_rank(MPI_COMM_WORLD, me, mpi_err)
     call MPI_Comm_size(MPI_COMM_WORLD, nprocs, mpi_err)
@@ -41,12 +43,12 @@ contains
     end if
 
     allocate(count_(0:nprocs - 1), offset_(0:nprocs - 1))
-    call read_i64_vector(file_id, trim(dset_path)//"/"//trim(COUNT_DATASET_NAME), count_, hdferr)
+    call read_i64_vector(file_id, trim(dset_path)//"/"//trim(COUNT_DATASET_NAME),  count_,  hdferr)
     if (hdferr /= 0) return
     call read_i64_vector(file_id, trim(dset_path)//"/"//trim(OFFSET_DATASET_NAME), offset_, hdferr)
     if (hdferr /= 0) return
 
-    nlocal = count_(me)
+    nlocal       = count_(me)
     local_offset = offset_(me)
 
     call h5dopen_f(file_id, trim(dset_path)//"/data", data_id, hdferr)
@@ -120,6 +122,9 @@ contains
     if (hdferr == 0) hdferr = err_local
   end subroutine get_data_rank_dims
 
+  !============================================================================
+  ! h5fort_read_{kname}_0d — scalar (1D に委譲)
+  !============================================================================
   subroutine h5fort_read_r64_0d(file_id, dset_path, scalar, hdferr)
     integer(hid_t), intent(in) :: file_id
     character(len=*), intent(in) :: dset_path
@@ -171,6 +176,277 @@ contains
     end if
   end subroutine h5fort_read_i32_0d
 
+
+  !============================================================================
+  ! h5fort_read_{kname}_1d — 1D allocatable
+  !============================================================================
+  subroutine h5fort_read_r64_1d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    real(real64), allocatable, intent(out) :: array(:)
+    integer, intent(out) :: hdferr
+    integer(hid_t) :: data_id, fsid, msid, xfer_id
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: nlocal, local_offset
+    integer(hsize_t) :: dims_m(1)
+
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    allocate(array(nlocal))
+    call select_1d_slab(fsid, nlocal, local_offset, dims_m, msid, hdferr)
+    if (hdferr == 0) call h5dread_f(data_id, H5T_NATIVE_DOUBLE, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid,&
+        & xfer_prp=xfer_id)
+    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
+  end subroutine h5fort_read_r64_1d
+
+  subroutine h5fort_read_r32_1d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    real(real32), allocatable, intent(out) :: array(:)
+    integer, intent(out) :: hdferr
+    integer(hid_t) :: data_id, fsid, msid, xfer_id
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: nlocal, local_offset
+    integer(hsize_t) :: dims_m(1)
+
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    allocate(array(nlocal))
+    call select_1d_slab(fsid, nlocal, local_offset, dims_m, msid, hdferr)
+    if (hdferr == 0) call h5dread_f(data_id, H5T_NATIVE_REAL, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid,&
+        & xfer_prp=xfer_id)
+    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
+  end subroutine h5fort_read_r32_1d
+
+  subroutine h5fort_read_i32_1d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    integer(int32), allocatable, intent(out) :: array(:)
+    integer, intent(out) :: hdferr
+    integer(hid_t) :: data_id, fsid, msid, xfer_id
+    integer(hid_t) :: h5t_i32
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: nlocal, local_offset
+    integer(hsize_t) :: dims_m(1)
+
+    h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    allocate(array(nlocal))
+    call select_1d_slab(fsid, nlocal, local_offset, dims_m, msid, hdferr)
+    if (hdferr == 0) call h5dread_f(data_id, h5t_i32, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
+    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
+  end subroutine h5fort_read_i32_1d
+
+
+  !============================================================================
+  ! h5fort_read_{kname}_{rank}d — 2D–4D allocatable
+  !============================================================================
+  subroutine h5fort_read_r64_2d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    real(real64), allocatable, intent(out) :: array(:, :)
+    integer, intent(out) :: hdferr
+    integer(hid_t) :: data_id, fsid, msid, xfer_id
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: nlocal, local_offset
+    integer :: rank_
+    integer(hsize_t) :: dims(MAX_RANK), dims_m(2)
+
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    call get_data_rank_dims(data_id, rank_, dims, hdferr)
+    if (hdferr == 0 .and. rank_ /= 2) hdferr = -1
+    if (hdferr == 0) allocate(array(dims(1), nlocal))
+    if (hdferr == 0) call select_2d_slab(fsid, int(dims(1), int64), nlocal, local_offset, dims_m, msid, hdferr)
+    if (hdferr == 0) call h5dread_f(data_id, H5T_NATIVE_DOUBLE, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid,&
+        & xfer_prp=xfer_id)
+    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
+  end subroutine h5fort_read_r64_2d
+
+  subroutine h5fort_read_r64_3d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    real(real64), allocatable, intent(out) :: array(:, :, :)
+    integer, intent(out) :: hdferr
+    integer(hid_t) :: data_id, fsid, msid, xfer_id
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: nlocal, local_offset
+    integer :: rank_
+    integer(hsize_t) :: dims(MAX_RANK), dims_m(3)
+
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    call get_data_rank_dims(data_id, rank_, dims, hdferr)
+    if (hdferr == 0 .and. rank_ /= 3) hdferr = -1
+    if (hdferr == 0) allocate(array(dims(1), dims(2), nlocal))
+    if (hdferr == 0) call select_3d_slab(fsid, int(dims(1), int64), int(dims(2), int64), nlocal, local_offset, dims_m, msid, hdferr)
+    if (hdferr == 0) call h5dread_f(data_id, H5T_NATIVE_DOUBLE, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid,&
+        & xfer_prp=xfer_id)
+    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
+  end subroutine h5fort_read_r64_3d
+
+  subroutine h5fort_read_r64_4d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    real(real64), allocatable, intent(out) :: array(:, :, :, :)
+    integer, intent(out) :: hdferr
+    integer(hid_t) :: data_id, fsid, msid, xfer_id
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: nlocal, local_offset
+    integer :: rank_
+    integer(hsize_t) :: dims(MAX_RANK), dims_m(4)
+
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    call get_data_rank_dims(data_id, rank_, dims, hdferr)
+    if (hdferr == 0 .and. rank_ /= 4) hdferr = -1
+    if (hdferr == 0) allocate(array(dims(1), dims(2), dims(3), nlocal))
+    if (hdferr == 0) call select_4d_slab(fsid, int(dims(1), int64), int(dims(2), int64), int(dims(3), int64), nlocal, local_offset, dims_m, msid, hdferr)
+    if (hdferr == 0) call h5dread_f(data_id, H5T_NATIVE_DOUBLE, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid,&
+        & xfer_prp=xfer_id)
+    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
+  end subroutine h5fort_read_r64_4d
+
+  subroutine h5fort_read_r32_2d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    real(real32), allocatable, intent(out) :: array(:, :)
+    integer, intent(out) :: hdferr
+    integer(hid_t) :: data_id, fsid, msid, xfer_id
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: nlocal, local_offset
+    integer :: rank_
+    integer(hsize_t) :: dims(MAX_RANK), dims_m(2)
+
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    call get_data_rank_dims(data_id, rank_, dims, hdferr)
+    if (hdferr == 0 .and. rank_ /= 2) hdferr = -1
+    if (hdferr == 0) allocate(array(dims(1), nlocal))
+    if (hdferr == 0) call select_2d_slab(fsid, int(dims(1), int64), nlocal, local_offset, dims_m, msid, hdferr)
+    if (hdferr == 0) call h5dread_f(data_id, H5T_NATIVE_REAL, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid,&
+        & xfer_prp=xfer_id)
+    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
+  end subroutine h5fort_read_r32_2d
+
+  subroutine h5fort_read_r32_3d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    real(real32), allocatable, intent(out) :: array(:, :, :)
+    integer, intent(out) :: hdferr
+    integer(hid_t) :: data_id, fsid, msid, xfer_id
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: nlocal, local_offset
+    integer :: rank_
+    integer(hsize_t) :: dims(MAX_RANK), dims_m(3)
+
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    call get_data_rank_dims(data_id, rank_, dims, hdferr)
+    if (hdferr == 0 .and. rank_ /= 3) hdferr = -1
+    if (hdferr == 0) allocate(array(dims(1), dims(2), nlocal))
+    if (hdferr == 0) call select_3d_slab(fsid, int(dims(1), int64), int(dims(2), int64), nlocal, local_offset, dims_m, msid, hdferr)
+    if (hdferr == 0) call h5dread_f(data_id, H5T_NATIVE_REAL, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid,&
+        & xfer_prp=xfer_id)
+    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
+  end subroutine h5fort_read_r32_3d
+
+  subroutine h5fort_read_r32_4d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    real(real32), allocatable, intent(out) :: array(:, :, :, :)
+    integer, intent(out) :: hdferr
+    integer(hid_t) :: data_id, fsid, msid, xfer_id
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: nlocal, local_offset
+    integer :: rank_
+    integer(hsize_t) :: dims(MAX_RANK), dims_m(4)
+
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    call get_data_rank_dims(data_id, rank_, dims, hdferr)
+    if (hdferr == 0 .and. rank_ /= 4) hdferr = -1
+    if (hdferr == 0) allocate(array(dims(1), dims(2), dims(3), nlocal))
+    if (hdferr == 0) call select_4d_slab(fsid, int(dims(1), int64), int(dims(2), int64), int(dims(3), int64), nlocal, local_offset, dims_m, msid, hdferr)
+    if (hdferr == 0) call h5dread_f(data_id, H5T_NATIVE_REAL, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid,&
+        & xfer_prp=xfer_id)
+    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
+  end subroutine h5fort_read_r32_4d
+
+  subroutine h5fort_read_i32_2d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    integer(int32), allocatable, intent(out) :: array(:, :)
+    integer, intent(out) :: hdferr
+    integer(hid_t) :: data_id, fsid, msid, xfer_id
+    integer(hid_t) :: h5t_i32
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: nlocal, local_offset
+    integer :: rank_
+    integer(hsize_t) :: dims(MAX_RANK), dims_m(2)
+
+    h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    call get_data_rank_dims(data_id, rank_, dims, hdferr)
+    if (hdferr == 0 .and. rank_ /= 2) hdferr = -1
+    if (hdferr == 0) allocate(array(dims(1), nlocal))
+    if (hdferr == 0) call select_2d_slab(fsid, int(dims(1), int64), nlocal, local_offset, dims_m, msid, hdferr)
+    if (hdferr == 0) call h5dread_f(data_id, h5t_i32, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
+    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
+  end subroutine h5fort_read_i32_2d
+
+  subroutine h5fort_read_i32_3d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    integer(int32), allocatable, intent(out) :: array(:, :, :)
+    integer, intent(out) :: hdferr
+    integer(hid_t) :: data_id, fsid, msid, xfer_id
+    integer(hid_t) :: h5t_i32
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: nlocal, local_offset
+    integer :: rank_
+    integer(hsize_t) :: dims(MAX_RANK), dims_m(3)
+
+    h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    call get_data_rank_dims(data_id, rank_, dims, hdferr)
+    if (hdferr == 0 .and. rank_ /= 3) hdferr = -1
+    if (hdferr == 0) allocate(array(dims(1), dims(2), nlocal))
+    if (hdferr == 0) call select_3d_slab(fsid, int(dims(1), int64), int(dims(2), int64), nlocal, local_offset, dims_m, msid, hdferr)
+    if (hdferr == 0) call h5dread_f(data_id, h5t_i32, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
+    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
+  end subroutine h5fort_read_i32_3d
+
+  subroutine h5fort_read_i32_4d(file_id, dset_path, array, hdferr)
+    integer(hid_t), intent(in) :: file_id
+    character(len=*), intent(in) :: dset_path
+    integer(int32), allocatable, intent(out) :: array(:, :, :, :)
+    integer, intent(out) :: hdferr
+    integer(hid_t) :: data_id, fsid, msid, xfer_id
+    integer(hid_t) :: h5t_i32
+    integer(int64), allocatable :: count_(:), offset_(:)
+    integer(int64) :: nlocal, local_offset
+    integer :: rank_
+    integer(hsize_t) :: dims(MAX_RANK), dims_m(4)
+
+    h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    if (hdferr /= 0) return
+    call get_data_rank_dims(data_id, rank_, dims, hdferr)
+    if (hdferr == 0 .and. rank_ /= 4) hdferr = -1
+    if (hdferr == 0) allocate(array(dims(1), dims(2), dims(3), nlocal))
+    if (hdferr == 0) call select_4d_slab(fsid, int(dims(1), int64), int(dims(2), int64), int(dims(3), int64), nlocal, local_offset, dims_m, msid, hdferr)
+    if (hdferr == 0) call h5dread_f(data_id, h5t_i32, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
+    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
+  end subroutine h5fort_read_i32_4d
+
+
+  !============================================================================
+  ! h5fort_read_str_0d — parallel では未実装
+  !============================================================================
   subroutine h5fort_read_str_0d(file_id, dset_path, str, hdferr)
     integer(hid_t), intent(in) :: file_id
     character(len=*), intent(in) :: dset_path
@@ -178,10 +454,13 @@ contains
     integer, intent(out) :: hdferr
 
     str = ""
-    write(error_unit, '(a,a)') "[h5fort_parallel_read] ERROR: parallel string read is not implemented: ", trim(dset_path)
+    write(error_unit, '(a,a)') "[h5fort/parallel/read] ERROR: parallel string read is not implemented: ", trim(dset_path)
     hdferr = -1
   end subroutine h5fort_read_str_0d
 
+  !============================================================================
+  ! h5fort_read_lgc_{rank}d — logical (int32 から変換)
+  !============================================================================
   subroutine h5fort_read_lgc_0d(file_id, dset_path, scalar, hdferr)
     integer(hid_t), intent(in) :: file_id
     character(len=*), intent(in) :: dset_path
@@ -202,7 +481,7 @@ contains
 
     call h5fort_read_i32_1d(file_id, dset_path, iarray, hdferr)
     if (hdferr == 0) then
-      allocate(array(size(iarray, 1)))
+      allocate(array(size(iarray,1)))
       array = (iarray /= 0_int32)
     end if
   end subroutine h5fort_read_lgc_1d
@@ -216,7 +495,7 @@ contains
 
     call h5fort_read_i32_2d(file_id, dset_path, iarray, hdferr)
     if (hdferr == 0) then
-      allocate(array(size(iarray, 1), size(iarray, 2)))
+      allocate(array(size(iarray,1), size(iarray,2)))
       array = (iarray /= 0_int32)
     end if
   end subroutine h5fort_read_lgc_2d
@@ -230,7 +509,7 @@ contains
 
     call h5fort_read_i32_3d(file_id, dset_path, iarray, hdferr)
     if (hdferr == 0) then
-      allocate(array(size(iarray, 1), size(iarray, 2), size(iarray, 3)))
+      allocate(array(size(iarray,1), size(iarray,2), size(iarray,3)))
       array = (iarray /= 0_int32)
     end if
   end subroutine h5fort_read_lgc_3d
@@ -244,258 +523,11 @@ contains
 
     call h5fort_read_i32_4d(file_id, dset_path, iarray, hdferr)
     if (hdferr == 0) then
-      allocate(array(size(iarray, 1), size(iarray, 2), size(iarray, 3), size(iarray, 4)))
+      allocate(array(size(iarray,1), size(iarray,2), size(iarray,3), size(iarray,4)))
       array = (iarray /= 0_int32)
     end if
   end subroutine h5fort_read_lgc_4d
 
-  subroutine h5fort_read_r64_1d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    real(real64), allocatable, intent(out) :: array(:)
-    integer, intent(out) :: hdferr
-    integer(hid_t) :: data_id, fsid, msid, xfer_id
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: nlocal, local_offset
-    integer(hsize_t) :: dims_m(1)
-
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
-    if (hdferr /= 0) return
-    allocate(array(nlocal))
-    call select_1d_slab(fsid, nlocal, local_offset, dims_m, msid, hdferr)
-    if (hdferr == 0) call h5dread_f(data_id, H5T_NATIVE_DOUBLE, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
-    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
-  end subroutine h5fort_read_r64_1d
-
-  subroutine h5fort_read_r32_1d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    real(real32), allocatable, intent(out) :: array(:)
-    integer, intent(out) :: hdferr
-    integer(hid_t) :: data_id, fsid, msid, xfer_id
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: nlocal, local_offset
-    integer(hsize_t) :: dims_m(1)
-
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
-    if (hdferr /= 0) return
-    allocate(array(nlocal))
-    call select_1d_slab(fsid, nlocal, local_offset, dims_m, msid, hdferr)
-    if (hdferr == 0) call h5dread_f(data_id, H5T_NATIVE_REAL, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
-    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
-  end subroutine h5fort_read_r32_1d
-
-  subroutine h5fort_read_i32_1d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    integer(int32), allocatable, intent(out) :: array(:)
-    integer, intent(out) :: hdferr
-    integer(hid_t) :: data_id, fsid, msid, xfer_id, h5t_i32
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: nlocal, local_offset
-    integer(hsize_t) :: dims_m(1)
-
-    h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
-    if (hdferr /= 0) return
-    allocate(array(nlocal))
-    call select_1d_slab(fsid, nlocal, local_offset, dims_m, msid, hdferr)
-    if (hdferr == 0) call h5dread_f(data_id, h5t_i32, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
-    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
-  end subroutine h5fort_read_i32_1d
-
-  subroutine h5fort_read_r64_2d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    real(real64), allocatable, intent(out) :: array(:, :)
-    integer, intent(out) :: hdferr
-    integer(hid_t) :: data_id, fsid, msid, xfer_id
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: nlocal, local_offset
-    integer :: rank
-    integer(hsize_t) :: dims(MAX_RANK), dims_m(2)
-
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
-    if (hdferr /= 0) return
-    call get_data_rank_dims(data_id, rank, dims, hdferr)
-    if (hdferr == 0 .and. rank /= 2) hdferr = -1
-    if (hdferr == 0) allocate(array(dims(1), nlocal))
-    if (hdferr == 0) call select_2d_slab(fsid, int(dims(1), int64), nlocal, local_offset, dims_m, msid, hdferr)
-    if (hdferr == 0) call h5dread_f(data_id, H5T_NATIVE_DOUBLE, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
-    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
-  end subroutine h5fort_read_r64_2d
-
-  subroutine h5fort_read_r32_2d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    real(real32), allocatable, intent(out) :: array(:, :)
-    integer, intent(out) :: hdferr
-    integer(hid_t) :: data_id, fsid, msid, xfer_id
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: nlocal, local_offset
-    integer :: rank
-    integer(hsize_t) :: dims(MAX_RANK), dims_m(2)
-
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
-    if (hdferr /= 0) return
-    call get_data_rank_dims(data_id, rank, dims, hdferr)
-    if (hdferr == 0 .and. rank /= 2) hdferr = -1
-    if (hdferr == 0) allocate(array(dims(1), nlocal))
-    if (hdferr == 0) call select_2d_slab(fsid, int(dims(1), int64), nlocal, local_offset, dims_m, msid, hdferr)
-    if (hdferr == 0) call h5dread_f(data_id, H5T_NATIVE_REAL, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
-    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
-  end subroutine h5fort_read_r32_2d
-
-  subroutine h5fort_read_i32_2d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    integer(int32), allocatable, intent(out) :: array(:, :)
-    integer, intent(out) :: hdferr
-    integer(hid_t) :: data_id, fsid, msid, xfer_id, h5t_i32
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: nlocal, local_offset
-    integer :: rank
-    integer(hsize_t) :: dims(MAX_RANK), dims_m(2)
-
-    h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
-    if (hdferr /= 0) return
-    call get_data_rank_dims(data_id, rank, dims, hdferr)
-    if (hdferr == 0 .and. rank /= 2) hdferr = -1
-    if (hdferr == 0) allocate(array(dims(1), nlocal))
-    if (hdferr == 0) call select_2d_slab(fsid, int(dims(1), int64), nlocal, local_offset, dims_m, msid, hdferr)
-    if (hdferr == 0) call h5dread_f(data_id, h5t_i32, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
-    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
-  end subroutine h5fort_read_i32_2d
-
-  subroutine h5fort_read_r64_3d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    real(real64), allocatable, intent(out) :: array(:, :, :)
-    integer, intent(out) :: hdferr
-    integer(hid_t) :: data_id, fsid, msid, xfer_id
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: nlocal, local_offset
-    integer :: rank
-    integer(hsize_t) :: dims(MAX_RANK), dims_m(3)
-
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
-    if (hdferr /= 0) return
-    call get_data_rank_dims(data_id, rank, dims, hdferr)
-    if (hdferr == 0 .and. rank /= 3) hdferr = -1
-    if (hdferr == 0) allocate(array(dims(1), dims(2), nlocal))
-    if (hdferr == 0) call select_3d_slab(fsid, int(dims(1), int64), int(dims(2), int64), nlocal, local_offset, dims_m, msid, hdferr)
-    if (hdferr == 0) call h5dread_f(data_id, H5T_NATIVE_DOUBLE, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
-    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
-  end subroutine h5fort_read_r64_3d
-
-  subroutine h5fort_read_r32_3d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    real(real32), allocatable, intent(out) :: array(:, :, :)
-    integer, intent(out) :: hdferr
-    integer(hid_t) :: data_id, fsid, msid, xfer_id
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: nlocal, local_offset
-    integer :: rank
-    integer(hsize_t) :: dims(MAX_RANK), dims_m(3)
-
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
-    if (hdferr /= 0) return
-    call get_data_rank_dims(data_id, rank, dims, hdferr)
-    if (hdferr == 0 .and. rank /= 3) hdferr = -1
-    if (hdferr == 0) allocate(array(dims(1), dims(2), nlocal))
-    if (hdferr == 0) call select_3d_slab(fsid, int(dims(1), int64), int(dims(2), int64), nlocal, local_offset, dims_m, msid, hdferr)
-    if (hdferr == 0) call h5dread_f(data_id, H5T_NATIVE_REAL, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
-    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
-  end subroutine h5fort_read_r32_3d
-
-  subroutine h5fort_read_i32_3d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    integer(int32), allocatable, intent(out) :: array(:, :, :)
-    integer, intent(out) :: hdferr
-    integer(hid_t) :: data_id, fsid, msid, xfer_id, h5t_i32
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: nlocal, local_offset
-    integer :: rank
-    integer(hsize_t) :: dims(MAX_RANK), dims_m(3)
-
-    h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
-    if (hdferr /= 0) return
-    call get_data_rank_dims(data_id, rank, dims, hdferr)
-    if (hdferr == 0 .and. rank /= 3) hdferr = -1
-    if (hdferr == 0) allocate(array(dims(1), dims(2), nlocal))
-    if (hdferr == 0) call select_3d_slab(fsid, int(dims(1), int64), int(dims(2), int64), nlocal, local_offset, dims_m, msid, hdferr)
-    if (hdferr == 0) call h5dread_f(data_id, h5t_i32, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
-    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
-  end subroutine h5fort_read_i32_3d
-
-  subroutine h5fort_read_r64_4d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    real(real64), allocatable, intent(out) :: array(:, :, :, :)
-    integer, intent(out) :: hdferr
-    integer(hid_t) :: data_id, fsid, msid, xfer_id
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: nlocal, local_offset
-    integer :: rank
-    integer(hsize_t) :: dims(MAX_RANK), dims_m(4)
-
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
-    if (hdferr /= 0) return
-    call get_data_rank_dims(data_id, rank, dims, hdferr)
-    if (hdferr == 0 .and. rank /= 4) hdferr = -1
-    if (hdferr == 0) allocate(array(dims(1), dims(2), dims(3), nlocal))
-    if (hdferr == 0) call select_4d_slab(fsid, int(dims(1), int64), int(dims(2), int64), int(dims(3), int64), nlocal, local_offset, dims_m, msid, hdferr)
-    if (hdferr == 0) call h5dread_f(data_id, H5T_NATIVE_DOUBLE, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
-    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
-  end subroutine h5fort_read_r64_4d
-
-  subroutine h5fort_read_r32_4d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    real(real32), allocatable, intent(out) :: array(:, :, :, :)
-    integer, intent(out) :: hdferr
-    integer(hid_t) :: data_id, fsid, msid, xfer_id
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: nlocal, local_offset
-    integer :: rank
-    integer(hsize_t) :: dims(MAX_RANK), dims_m(4)
-
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
-    if (hdferr /= 0) return
-    call get_data_rank_dims(data_id, rank, dims, hdferr)
-    if (hdferr == 0 .and. rank /= 4) hdferr = -1
-    if (hdferr == 0) allocate(array(dims(1), dims(2), dims(3), nlocal))
-    if (hdferr == 0) call select_4d_slab(fsid, int(dims(1), int64), int(dims(2), int64), int(dims(3), int64), nlocal, local_offset, dims_m, msid, hdferr)
-    if (hdferr == 0) call h5dread_f(data_id, H5T_NATIVE_REAL, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
-    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
-  end subroutine h5fort_read_r32_4d
-
-  subroutine h5fort_read_i32_4d(file_id, dset_path, array, hdferr)
-    integer(hid_t), intent(in) :: file_id
-    character(len=*), intent(in) :: dset_path
-    integer(int32), allocatable, intent(out) :: array(:, :, :, :)
-    integer, intent(out) :: hdferr
-    integer(hid_t) :: data_id, fsid, msid, xfer_id, h5t_i32
-    integer(int64), allocatable :: count_(:), offset_(:)
-    integer(int64) :: nlocal, local_offset
-    integer :: rank
-    integer(hsize_t) :: dims(MAX_RANK), dims_m(4)
-
-    h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
-    if (hdferr /= 0) return
-    call get_data_rank_dims(data_id, rank, dims, hdferr)
-    if (hdferr == 0 .and. rank /= 4) hdferr = -1
-    if (hdferr == 0) allocate(array(dims(1), dims(2), dims(3), nlocal))
-    if (hdferr == 0) call select_4d_slab(fsid, int(dims(1), int64), int(dims(2), int64), int(dims(3), int64), nlocal, local_offset, dims_m, msid, hdferr)
-    if (hdferr == 0) call h5dread_f(data_id, h5t_i32, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
-    call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
-  end subroutine h5fort_read_i32_4d
 
   include "h5fort_parallel_read_slabs.inc"
-
 end module h5fort_parallel_read

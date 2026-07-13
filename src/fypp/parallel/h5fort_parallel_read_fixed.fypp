@@ -1,0 +1,55 @@
+! DO NOT EDIT — generated from src/fypp/parallel/h5fort_parallel_read_fixed.fypp
+! To regenerate: scripts/generate_fypp.sh
+! 固定長（非allocatable）配列向け。allocatable版を呼んでから形状チェック・コピーする。
+#:include "common.fypp"
+module h5fort_parallel_read_fixed
+  use hdf5
+  use, intrinsic :: iso_fortran_env
+  use h5fort_parallel_read
+  implicit none
+  private
+
+#:for kname, ftype, h5type in KINDS
+  #:for rank in RANKS
+  public :: h5fort_read_${kname}$_${rank}$d_fixed
+  #:endfor
+#:endfor
+#:for rank in RANKS
+  public :: h5fort_read_lgc_${rank}$d_fixed
+#:endfor
+
+contains
+
+#:include "check_shape_and_copy.fypp"
+#:for kname, ftype, h5type in KINDS
+  #:for rank in RANKS
+  subroutine h5fort_read_${kname}$_${rank}$d_fixed(file_id, dset_path, array, hdferr)
+    integer(hid_t),   intent(in)  :: file_id
+    character(len=*), intent(in)  :: dset_path
+    ${ftype}$,        intent(out) :: array(${', '.join([':']*rank)}$)
+    integer,          intent(out) :: hdferr
+    ${ftype}$, allocatable :: tmp(${', '.join([':']*rank)}$)
+    call h5fort_read_${kname}$_${rank}$d(file_id, dset_path, tmp, hdferr)
+    if (hdferr /= 0) return
+    @:CHECK_SHAPE_AND_COPY(parallel, tmp, array)
+  end subroutine h5fort_read_${kname}$_${rank}$d_fixed
+
+  #:endfor
+#:endfor
+
+#:for rank in RANKS
+  subroutine h5fort_read_lgc_${rank}$d_fixed(file_id, dset_path, array, hdferr)
+    integer(hid_t),   intent(in)  :: file_id
+    character(len=*), intent(in)  :: dset_path
+    logical,          intent(out) :: array(${', '.join([':']*rank)}$)
+    integer,          intent(out) :: hdferr
+    logical, allocatable :: tmp(${', '.join([':']*rank)}$)
+    call h5fort_read_lgc_${rank}$d(file_id, dset_path, tmp, hdferr)
+    if (hdferr /= 0) return
+    @:CHECK_SHAPE_AND_COPY(parallel, tmp, array)
+  end subroutine h5fort_read_lgc_${rank}$d_fixed
+
+#:endfor
+#:del CHECK_SHAPE_AND_COPY
+
+end module h5fort_parallel_read_fixed

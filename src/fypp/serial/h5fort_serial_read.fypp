@@ -1,0 +1,184 @@
+! DO NOT EDIT — generated from src/fypp/serial/h5fort_serial_read.fypp
+! To regenerate: scripts/generate_fypp.sh
+#:include "common.fypp"
+#include "h5fort_serial.inc"
+module h5fort_serial_read
+  use hdf5
+  use, intrinsic :: iso_fortran_env
+  implicit none
+  private
+
+#:for kname, ftype, h5type in KINDS
+  public :: h5fort_read_${kname}$_0d
+  #:for rank in RANKS
+  public :: h5fort_read_${kname}$_${rank}$d
+  #:endfor
+#:endfor
+  public :: h5fort_read_str_0d
+  public :: h5fort_read_lgc_0d
+#:for rank in RANKS
+  public :: h5fort_read_lgc_${rank}$d
+#:endfor
+
+contains
+
+  !============================================================================
+  ! real64 / real32 / int32 — scalar (0D)
+  !============================================================================
+#:for kname, ftype, h5type in KINDS
+  subroutine h5fort_read_${kname}$_0d(file_id, dset_path, scalar, hdferr)
+    integer(hid_t),   intent(in)  :: file_id
+    character(len=*), intent(in)  :: dset_path
+    ${ftype}$,        intent(out) :: scalar
+    integer,          intent(out) :: hdferr
+
+    integer(hid_t)   :: dset_id
+    integer(hsize_t) :: dims(1)
+    integer          :: err_local
+
+    dims = [1_hsize_t]
+    call h5dopen_f(file_id, trim(dset_path), dset_id, hdferr)
+    if (hdferr /= 0) then
+      write(error_unit,'(A,A)') "[h5fort/serial/read] ERROR: h5dopen_f failed for: ", trim(dset_path)
+      return
+    end if
+    call h5dread_f(dset_id, ${h5type}$, scalar, dims, hdferr)
+    call h5dclose_f(dset_id, err_local)
+  end subroutine h5fort_read_${kname}$_0d
+
+#:endfor
+
+  !============================================================================
+  ! real64 / real32 / int32 — arrays (1D–4D, allocatable)
+  !============================================================================
+#:for kname, ftype, h5type in KINDS
+  #:for rank in RANKS
+  subroutine h5fort_read_${kname}$_${rank}$d(file_id, dset_path, array, hdferr)
+    integer(hid_t),           intent(in)  :: file_id
+    character(len=*),         intent(in)  :: dset_path
+    ${ftype}$, allocatable,   intent(out) :: array(${', '.join([':']*rank)}$)
+    integer,                  intent(out) :: hdferr
+
+    integer(hid_t)   :: dset_id
+    integer          :: rank_
+    integer(hsize_t) :: dims(MAX_RANK)
+    integer          :: err_local
+
+    call get_dataset_info(file_id, dset_path, dset_id, rank_, dims, hdferr)
+    if (hdferr /= 0) return
+
+    if (rank_ /= ${rank}$) then
+      write(error_unit,'(A,I0,A)') "[h5fort/serial/read] ERROR: dataset rank=", rank_, &
+                           " but target array is rank-${rank}$."
+      hdferr = -1; call h5dclose_f(dset_id, err_local); return
+    end if
+
+    allocate(array(${', '.join(['dims(' + str(i+1) + ')' for i in range(rank)])}$))
+
+    call h5dread_f(dset_id, ${h5type}$, array, dims(1:${rank}$), hdferr)
+    call h5dclose_f(dset_id, err_local)
+  end subroutine h5fort_read_${kname}$_${rank}$d
+
+  #:endfor
+#:endfor
+
+  !============================================================================
+  ! character scalar (可変長文字列)
+  !============================================================================
+  subroutine h5fort_read_str_0d(file_id, dset_path, str, hdferr)
+    integer(hid_t),                intent(in)  :: file_id
+    character(len=*),              intent(in)  :: dset_path
+    character(len=:), allocatable, intent(out) :: str
+    integer,                       intent(out) :: hdferr
+
+    integer(hid_t)  :: dset_id, str_type_id
+    integer(hsize_t):: dims(1)
+    integer(size_t) :: str_len
+    integer         :: err_local
+
+    dims = [1_hsize_t]
+
+    call h5dopen_f(file_id, trim(dset_path), dset_id, hdferr)
+    if (hdferr /= 0) then
+      write(*,'(A,A)') "[h5fort/serial/read] ERROR: h5dopen_f failed for: ", trim(dset_path)
+      return
+    end if
+
+    call h5dget_type_f(dset_id, str_type_id, err_local)
+    if (err_local /= 0) then
+      hdferr = err_local
+      call h5dclose_f(dset_id, err_local); return
+    end if
+
+    call h5tget_size_f(str_type_id, str_len, err_local)
+    if (err_local /= 0) then
+      hdferr = err_local
+      call h5tclose_f(str_type_id, err_local); call h5dclose_f(dset_id, err_local); return
+    end if
+
+    allocate(character(len=str_len) :: str)
+    call h5dread_f(dset_id, str_type_id, str, dims, hdferr)
+    call h5tclose_f(str_type_id, err_local)
+    call h5dclose_f(dset_id, err_local)
+  end subroutine h5fort_read_str_0d
+
+  !============================================================================
+  ! logical scalar — int32 (0/1) として保存
+  !============================================================================
+  subroutine h5fort_read_lgc_0d(file_id, dset_path, scalar, hdferr)
+    integer(hid_t),   intent(in)  :: file_id
+    character(len=*), intent(in)  :: dset_path
+    logical,          intent(out) :: scalar
+    integer,          intent(out) :: hdferr
+
+    integer(hid_t)   :: dset_id
+    integer(hsize_t) :: dims(1)
+    integer(int32)   :: ival
+    integer          :: err_local
+
+    dims = [1_hsize_t]
+    call h5dopen_f(file_id, trim(dset_path), dset_id, hdferr)
+    if (hdferr /= 0) then
+      write(error_unit,'(A,A)') "[h5fort_serial_write] ERROR: h5dopen_f failed for: ", trim(dset_path)
+      return
+    end if
+    call h5dread_f(dset_id, H5T_NATIVE_INTEGER, ival, dims, hdferr)
+    scalar = (ival /= 0_int32)
+    call h5dclose_f(dset_id, err_local)
+  end subroutine h5fort_read_lgc_0d
+
+  !============================================================================
+  ! logical arrays (1D–4D)
+  !============================================================================
+#:for rank in RANKS
+  subroutine h5fort_read_lgc_${rank}$d(file_id, dset_path, array, hdferr)
+    integer(hid_t),       intent(in)  :: file_id
+    character(len=*),     intent(in)  :: dset_path
+    logical, allocatable, intent(out) :: array(${', '.join([':']*rank)}$)
+    integer,              intent(out) :: hdferr
+
+    integer(hid_t)              :: dset_id
+    integer                     :: rank_
+    integer(hsize_t)            :: dims(MAX_RANK)
+    integer(int32), allocatable :: iarray(${', '.join([':']*rank)}$)
+    integer                     :: err_local
+
+    call get_dataset_info(file_id, dset_path, dset_id, rank_, dims, hdferr)
+    if (hdferr /= 0) return
+
+    if (rank_ /= ${rank}$) then
+      write(error_unit,'(A,I0,A)') "[h5fort_serial_write] ERROR: dataset rank=", rank_, &
+                           " but target array is rank-${rank}$."
+      hdferr = -1; call h5dclose_f(dset_id, err_local); return
+    end if
+
+    allocate(iarray(${', '.join(['dims(' + str(i+1) + ')' for i in range(rank)])}$))
+    call h5dread_f(dset_id, H5T_NATIVE_INTEGER, iarray, dims(1:${rank}$), hdferr)
+    allocate(array(${', '.join(['dims(' + str(i+1) + ')' for i in range(rank)])}$))
+    array = (iarray /= 0_int32)
+    call h5dclose_f(dset_id, err_local)
+  end subroutine h5fort_read_lgc_${rank}$d
+
+#:endfor
+#include "h5fort_serial_read_utils.inc"
+end module h5fort_serial_read

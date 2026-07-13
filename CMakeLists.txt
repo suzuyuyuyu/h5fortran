@@ -1,24 +1,27 @@
 cmake_minimum_required(VERSION 3.20)
-project(h5fortran LANGUAGES Fortran)
+project(h5fortran
+  VERSION 0.1.0
+  DESCRIPTION "Fortran interface to HDF5"
+  LANGUAGES Fortran)
 
 include(CTest)
 
 set(CMAKE_Fortran_MODULE_DIRECTORY "${CMAKE_BINARY_DIR}/mod")
 file(MAKE_DIRECTORY "${CMAKE_Fortran_MODULE_DIRECTORY}")
 
-set(H5FORTRAN_PHDF5_ROOT "$ENV{HOME}/.local/opt/intel/phdf5" CACHE PATH
-  "Parallel HDF5 installation prefix")
+set(H5FORTRAN_HDF5_ROOT "$ENV{HOME}/.local/opt/intel/phdf5" CACHE PATH
+  "(Parallel) HDF5 installation prefix")
 
-set(HDF5_ROOT "${H5FORTRAN_PHDF5_ROOT}")
+set(HDF5_ROOT "${H5FORTRAN_HDF5_ROOT}")
 set(HDF5_PREFER_PARALLEL ON)
 find_package(HDF5 REQUIRED COMPONENTS Fortran HL)
 
-file(STRINGS "${H5FORTRAN_PHDF5_ROOT}/include/H5pubconf.h" _h5_parallel
+file(STRINGS "${H5FORTRAN_HDF5_ROOT}/include/H5pubconf.h" _h5_parallel
   REGEX "^#define H5_HAVE_PARALLEL 1")
 if(NOT _h5_parallel)
-  message(FATAL_ERROR "HDF5 at ${H5FORTRAN_PHDF5_ROOT} is not parallel (H5_HAVE_PARALLEL not set)")
+  message(FATAL_ERROR "HDF5 at ${H5FORTRAN_HDF5_ROOT} is not parallel (H5_HAVE_PARALLEL not set)")
 endif()
-message(STATUS "HDF5 parallel: yes (${H5FORTRAN_PHDF5_ROOT})")
+message(STATUS "HDF5 parallel: yes (${H5FORTRAN_HDF5_ROOT})")
 
 add_library(h5fortran_hdf5 INTERFACE)
 target_include_directories(h5fortran_hdf5 INTERFACE ${HDF5_INCLUDE_DIRS})
@@ -27,9 +30,12 @@ target_link_libraries(h5fortran_hdf5 INTERFACE
   ${HDF5_Fortran_LIBRARIES}
   ${HDF5_LIBRARIES})
 target_link_options(h5fortran_hdf5 INTERFACE
-  "-Wl,-rpath,${H5FORTRAN_PHDF5_ROOT}/lib")
+  "-Wl,-rpath,${H5FORTRAN_HDF5_ROOT}/lib")
 
 add_subdirectory(src)
+
+install(FILES "${CMAKE_SOURCE_DIR}/cmake/h5fortranConfig.cmake"
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/h5fortran")
 
 if(BUILD_TESTING)
   add_subdirectory(test)
