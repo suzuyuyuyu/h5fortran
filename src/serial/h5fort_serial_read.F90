@@ -1,5 +1,6 @@
 ! DO NOT EDIT — generated from src/fypp/serial/h5fort_serial_read.fypp
-! To regenerate: scripts/generate_fypp.sh
+! To regenerate: src/fypp/generate_fypp.sh
+
 #include "h5fort_serial.inc"
 module h5fort_serial_read
   use hdf5

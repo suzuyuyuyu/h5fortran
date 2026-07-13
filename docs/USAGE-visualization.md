@@ -1,107 +1,77 @@
- Tohoku University, Keiriki
-------------------------------------------------------------------------------
+# Parallel HDF5 / XDMF 出力
 
- MODULE: h5fort_parallel_hdf5_xdmf
+`t_phdf5_writer` は、全 MPI rank の mesh と属性を一つの HDF5 ファイルへ集合的に書き、ParaView などから参照する XDMF fragment を生成します。
 
-> @author
-> Yuta Suzuki
+## 対応型
 
- DESCRIPTION:
->  Output HDF5 files and XDMF fragments for parallel visualization with ParaView.
+geometry の座標は `real(real32/real64/real128)`、connectivity は `integer(int8/int16/int32/int64)` に対応します。point/cell data は次のすべてについて 1D scalar と 2D vector/tensor を書けます。
 
- REVISION HISTORY:
-------------------------------------------------------------------------------
- module_phdf5.F90 - Parallel HDF5 ライタ (MPI-IO / Collective I/O)
+- `integer(int8)`、`integer(int16)`、`integer(int32)`、`integer(int64)`
+- `real(real32)`、`real(real64)`、`real(real128)`
 
- 既存の module_hdf5 / t_hdf5_writer と同じ呼び出し界面を保ちつつ、
- 全ランクが 1 つの共有 HDF5 ファイルへ MPI-IO で書き込む。
+XDMF の `NumberType` と `Precision` は、書き込んだ Fortran kind から自動設定されます。従来の `add_point_attr` / `add_cell_attr` も互換性のため利用できますが、通常は明示的に呼ぶ必要はありません。
 
- HDF5 ファイル構造 (タイムステップごとに 1 ファイル、全ランク共有):
-   ファイル名パターン:
-     ts{ts:04d}.h5  (/ugrid + /polydata 両グループを格納)
+## UnstructuredGrid
 
-   ts{ts:04d}.h5:
-   /ugrid/
-     geometry/
-       nodes        [total_np][3]   float64   (全ランク連結)
-       connectivity [total_nc][8]   int64     (グローバルノード番号, offset_points 加算済み)
-     point_data/
-       <name>       [total_np]      or [total_np][ncomp]
-     cell_data/
-       <name>       [total_nc]
-   /polydata/
-     geometry/
-       nodes        [total_np][3]   float64
-     point_data/
-       <name>       [total_np]      or [total_np][ncomp]
+```fortran
+use h5fort
+use mpi
+use iso_fortran_env, only: int64, real64
 
- connectivity について:
-   呼び出し側がグローバル 0-indexed 番号に変換してから渡す。
-   (ローカル -> グローバルの変換は sample_build_comm_info 等の呼び出し側で行う)
-   XDMF がグローバル dataset を直接参照するため、グローバルノード番号で格納する。
+type(t_phdf5_writer) :: writer
+real(real64) :: nodes(3, num_points)
+integer(int64) :: connectivity(8, num_cells)
+real(real64) :: pressure(num_points)
+real(real64) :: velocity(3, num_points)
 
- 次元の注意 (module_hdf5 と同一):
-   Fortran 配列 data(ncomp, np) (列優先) を HDF5 dims=[ncomp, np] で渡すと
-   HDF5 ファイルには C 行優先の [np][ncomp] として格納される。
-   XDMF の Dimensions 属性も C 順: "np ncomp"
+writer%h5_filepath = 'phdf5/seq00000.h5'
+writer%h5_filename = 'seq00000.h5'
+writer%metadata_dir = 'metadata'
+writer%rel_dir_meta2h5 = '../phdf5'
+writer%output_type = 'UnstructuredGrid'
+writer%num_points = num_points
+writer%num_cells = num_cells
+writer%seq = 0
+writer%time = 0.0_real64
 
- 使い方:
+call writer%init()
+call writer%write_geometry_ugrid(nodes, connectivity)
+call writer%write_point_data(pressure, 'Pressure')
+call writer%write_point_data(velocity, 'Velocity')
+if (rank == 0) call writer%write_fragment()
+call writer%close()
+```
 
-   ug%h5_filepath   = 'result/phdf5/ts0000.h5'
-   ug%output_type = 'UnstructuredGrid'
-   ug%num_points  = np
-   ug%num_cells   = nc
-   ug%comm        = MPI_COMM_WORLD     ! integer MPI コミュニケータ
-   ug%me          = me_proc
-   ug%nprocs      = nprocs
-   call ug%init()     ! MPI_Allgather + ファイル新規作成（全ランク集合的）
-   call ug%write_geometry_ugrid(nodes, connectivity)
-   call ug%write_point_data(pressure, 'Pressure')
-   call ug%close()
+`num_points` と `num_cells` は各 rank が所有する要素数です。ghost 要素は含めません。connectivity は呼び出し側でグローバル 0-origin node ID に変換して渡します。`init`、HDF5 write、`close` は全 rank が同じ順序で呼び、`write_fragment` は rank 0 のみが呼びます。
 
-   ! PolyData は同じファイルに追記（init が既存ファイルを RDWR で再オープン）
-   pd%h5_filepath   = 'result/phdf5/ts0000.h5'
-   pd%output_type = 'PolyData'
-   ...
-   call pd%init()
-   call pd%write_geometry_polydata(nodes)
-   call pd%close()
+## PolyData
 
+```fortran
+writer%output_type = 'PolyData'
+writer%num_points = num_points
+writer%num_cells = 0
+call writer%init()
+call writer%write_geometry_polydata(nodes)
+call writer%write_point_data(pressure, 'Pressure')
+if (rank == 0) call writer%write_fragment()
+call writer%close()
+```
 
-------------------------------------------------------------------------------
+同じ `h5_filepath` に先に UnstructuredGrid、次に PolyData を書くと、それぞれ `/ugrid` と `/polydata` group として保存されます。
 
- write_fragment でグローバル mesh を直接参照する。
- HyperSlab / rank Grid は使わない。
- ParaView XDMF3 Reader T で読み込み可能。
+## 現在の保存形式
 
- 断片ファイル名:
-   metadata/ts{ts:04d}_{output_type}_phdf5.xdmf.part
+```text
+/ugrid/geometry/nodes
+/ugrid/geometry/connectivity
+/ugrid/point_data/<field-name>
+/ugrid/cell_data/<field-name>
+/polydata/geometry/nodes
+/polydata/point_data/<field-name>
+```
 
- 断片ファイル構造 (ugrid 例):
-   <Topology TopologyType="Hexahedron" NumberOfElements="1000">
-     <DataItem Format="HDF" NumberType="Int" Precision="8" Dimensions="1000 8">
-       ../phdf5/ts0000.h5:/ugrid/geometry/connectivity
-     </DataItem>
-   </Topology>
-   <Geometry GeometryType="XYZ">
-     <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="1694 3">
-       ../phdf5/ts0000.h5:/ugrid/geometry/nodes
-     </DataItem>
-   </Geometry>
-   <Attribute Name="Pressure" AttributeType="Scalar" Center="Node">
-     <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="1694">
-       ../phdf5/ts0000.h5:/ugrid/point_data/Pressure
-     </DataItem>
-   </Attribute>
-   ...
+Fortran の `data(ncomp, nlocal)` は、HDF5 上では `[global_n, ncomp]`、XDMF の `Dimensions` も `"global_n ncomp"` になります。現在は呼び出しごとに固定サイズ dataset を作成し、従来の XDMF fragment 形式を維持しています。
 
- output_xdmf がこの断片を <Grid GridType="Uniform"> でラップし、
- Temporal Collection を構成する。
+## 将来の unlimited dataset 化
 
- 最終 XDMF 構造:
-   Temporal Collection
-    ├ Uniform Grid (ts0000) ← time + fragment content
-    ├ Uniform Grid (ts0001)
-    └ ...
-
-------------------------------------------------------------------------------
+時系列 `misc` データを単一 dataset へ追記する設計は、`H5S_UNLIMITED`、chunk、hyperslab extend を使う別の保存方式として実装する予定です。今回の fypp 化ではその変更を先取りせず、現在のファイル構造と fragment 出力を維持しています。

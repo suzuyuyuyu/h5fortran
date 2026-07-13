@@ -2,7 +2,7 @@ program test_parallel
   use hdf5
   use mpi
   use h5fort
-  use, intrinsic :: iso_fortran_env, only: real64
+  use, intrinsic :: iso_fortran_env, only: int32, real32, real64
   implicit none
 
   integer, parameter :: nrank = 4
@@ -12,6 +12,10 @@ program test_parallel
   integer(hid_t) :: file_id, fapl_id
   real(real64), allocatable :: value_all(:), value(:), value_read(:), value_fixed(:)
   real(real64), allocatable :: coord_all(:, :), coord(:, :), coord_read(:, :), coord_fixed(:, :)
+  real(real32), allocatable :: zero_local(:), zero_read(:)
+  integer(int32), allocatable :: int_local(:), int_read(:)
+  logical, allocatable :: logical_local(:), logical_read(:), logical_fixed(:)
+  real(real64), allocatable :: bad_dims(:, :), wrong_rank(:)
 
   call MPI_Init(ierr)
   call MPI_Comm_rank(MPI_COMM_WORLD, me, ierr)
@@ -25,12 +29,23 @@ program test_parallel
   allocate(value(nv), value_fixed(nv), coord(3, nc), coord_fixed(3, nc))
   value = value_all(ov + 1:ov + nv)
   coord = coord_all(:, oc + 1:oc + nc)
+  allocate(zero_local(me), int_local(me + 1), logical_local(me + 1), logical_fixed(me + 1))
+  zero_local = real(me, real32)
+  int_local = int(me, int32)
+  logical_local = mod(me, 2) == 0
 
   call h5open_f(hdferr); call check(hdferr)
 
   call open_file("test-parallel.h5", H5F_ACC_TRUNC_F, file_id, hdferr); call check(hdferr)
   call h5fort_pwrite(file_id, "/value", value, hdferr); call check(hdferr)
   call h5fort_pwrite(file_id, "/coord", coord, hdferr); call check(hdferr)
+  call h5fort_pwrite(file_id, "/zero", zero_local, hdferr); call check(hdferr)
+  call h5fort_pwrite(file_id, "/integer", int_local, hdferr); call check(hdferr)
+  call h5fort_pwrite(file_id, "/logical", logical_local, hdferr); call check(hdferr)
+  allocate(bad_dims(me + 1, 1))
+  call h5fort_pwrite(file_id, "/bad-dimensions", bad_dims, hdferr)
+  call assert(hdferr /= 0)
+  deallocate(bad_dims)
   call h5fclose_f(file_id, hdferr); call check(hdferr)
 
   call open_file("test-parallel.h5", H5F_ACC_RDONLY_F, file_id, hdferr); call check(hdferr)
@@ -38,21 +53,38 @@ program test_parallel
   call h5fort_pread_fixed(file_id, "/value", value_fixed, hdferr); call check(hdferr)
   call h5fort_pread(file_id, "/coord", coord_read, hdferr); call check(hdferr)
   call h5fort_pread_fixed(file_id, "/coord", coord_fixed, hdferr); call check(hdferr)
+  call h5fort_pread(file_id, "/zero", zero_read, hdferr); call check(hdferr)
+  call h5fort_pread(file_id, "/integer", int_read, hdferr); call check(hdferr)
+  call h5fort_pread(file_id, "/logical", logical_read, hdferr); call check(hdferr)
+  call h5fort_pread_fixed(file_id, "/logical", logical_fixed, hdferr); call check(hdferr)
   call assert(all(abs(value_read - value) < 1.0e-12_real64))
   call assert(all(abs(value_fixed - value) < 1.0e-12_real64))
   call assert(all(abs(coord_read - coord) < 1.0e-12_real64))
   call assert(all(abs(coord_fixed - coord) < 1.0e-12_real64))
+  call assert(all(zero_read == zero_local))
+  call assert(all(int_read == int_local))
+  call assert(all(logical_read .eqv. logical_local))
+  call assert(all(logical_fixed .eqv. logical_local))
+  call h5fort_pread(file_id, "/coord", wrong_rank, hdferr)
+  call assert(hdferr /= 0)
+  call h5fort_pread(file_id, "/missing", wrong_rank, hdferr)
+  call assert(hdferr /= 0)
   call h5fclose_f(file_id, hdferr); call check(hdferr)
 
   block
     type(t_h5fort_parallel) :: h5fp
+    call h5fp%open()
+    call assert(h5fp%hdferr /= 0)
+    h5fp%f_name = "file-that-does-not-exist.h5"
+    call h5fp%open(H5FORTRAN_READ_ONLY)
+    call assert(h5fp%hdferr /= 0)
     h5fp%f_name = "test-parallel-class.h5"
     call h5fp%open(mode=H5FORTRAN_FORCE_WRITE); call check(h5fp%hdferr)
     call h5fp%write("/value", value);           call check(h5fp%hdferr)
     call h5fp%write("/coord", coord);           call check(h5fp%hdferr)
     call h5fp%close();                          call check(h5fp%hdferr)
 
-    call h5fp%open(); call check(h5fp%hdferr)
+    call h5fp%open(H5FORTRAN_READ_ONLY); call check(h5fp%hdferr)
     call h5fp%read("/value", value_read);           call check(h5fp%hdferr)
     call h5fp%read_fixed("/value", value_fixed);    call check(h5fp%hdferr)
     call h5fp%read("/coord", coord_read);           call check(h5fp%hdferr)
@@ -62,6 +94,7 @@ program test_parallel
     call assert(all(abs(coord_read  - coord) < 1.0e-12_real64))
     call assert(all(abs(coord_fixed - coord) < 1.0e-12_real64))
     call h5fp%close(); call check(h5fp%hdferr)
+    call h5fp%close(); call assert(h5fp%hdferr /= 0)
   end block
 
   call h5close_f(hdferr); call check(hdferr)

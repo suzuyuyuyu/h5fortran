@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.20)
+project(h5fortran_consumer LANGUAGES Fortran)
+find_package(h5fortran CONFIG REQUIRED)
+add_executable(consumer main.F90)
+target_link_libraries(consumer PRIVATE h5fortran::h5fortran)

@@ -1,12 +1,30 @@
 #:set H5XDMF_WRITE_KINDS = [&
-  ('integer', 'int32'), &
-  ('integer', 'int64'), &
-  ('real', 'real32'), &
-  ('real', 'real64') &
+  ('integer', 'int8',  'Int',   1), &
+  ('integer', 'int16', 'Int',   2), &
+  ('integer', 'int32', 'Int',   4), &
+  ('integer', 'int64', 'Int',   8), &
+  ('real',    'real32', 'Float', 4), &
+  ('real',    'real64', 'Float', 8), &
+  ('real',    'real128', 'Float', 16) &
 ]
 #:set H5XDMF_WRITE_RANKS = [1, 2]
+#:set H5XDMF_REAL_KINDS = ['real32', 'real64', 'real128']
+#:set H5XDMF_INT_KINDS = ['int8', 'int16', 'int32', 'int64']
+#:set H5XDMF_PRECISION = {&
+  'int8': 1, 'int16': 2, 'int32': 4, 'int64': 8, &
+  'real32': 4, 'real64': 8, 'real128': 16 &
+}
+#:include "common.fypp"
+#!
+#! This file is the source of src/parallel/h5fort_parallel_hdf5_xdmf.F90.
+#! Keep the public t_phdf5_writer bindings compatible with the former
+#! hand-written implementation.
+#!
 
-module h5fort_h5xdmf_parallel
+! DO NOT EDIT — generated from src/fypp/h5xdmf/h5fort_h5xdmf_parallel.fypp
+! To regenerate: src/fypp/generate_fypp.sh
+
+module h5fort_parallel_hdf5_xdmf
   use hdf5
 ! # define USE_MPI_F08
 # ifdef USE_MPI_F08
@@ -18,11 +36,7 @@ module h5fort_h5xdmf_parallel
   implicit none
   private
 
-  public :: t_h5xdmf_writer
-
-  ! HDF5 型 ID
-  integer(HID_T) :: h5t_i32_
-  integer(HID_T) :: h5t_i64_
+  public :: t_phdf5_writer
 
   ! Checker flags
   logical, private :: is_file_initialized = .false.
@@ -31,15 +45,7 @@ module h5fort_h5xdmf_parallel
 
   integer, parameter :: MAX_ATTRS = 64
 
-  interface write_slab
-    #:for irflag, kind in H5XDMF_WRITE_KINDS
-    #:for rank in H5XDMF_WRITE_RANKS
-    module procedure :: write_slab_${kind}$_${rank}$d_
-    #:endfor
-    #:endfor
-  end interface write_slab
-
-  type :: t_h5xdmf_attr_info
+  type :: t_phdf5_attr_info
     character(len=64)  :: name      = ''
     character(len=16)  :: attr_type = ''   ! Scalar / Vector / Tensor6 / Tensor
     character(len=8)   :: center    = ''   ! Node / Cell
@@ -47,12 +53,12 @@ module h5fort_h5xdmf_parallel
     integer            :: precision = 8
     integer(int64)     :: n_total   = 0    ! グローバル要素数
     integer            :: ncomp     = 1
-  end type t_h5xdmf_attr_info
+  end type t_phdf5_attr_info
 
   !--------------------------------------------------------------------
   ! Parallel HDF5 writer class
   !--------------------------------------------------------------------
-  type :: t_h5xdmf_writer
+  type :: t_phdf5_writer
     ! Followings should be set by user before init()
     ! "UnstructuredGrid" or "PolyData"
     character(len=16) :: output_type = ''
@@ -72,6 +78,11 @@ module h5fort_h5xdmf_parallel
     integer(int64)    :: num_points  = 0_int64
     integer(int64)    :: num_cells   = 0_int64
 
+#   ifdef USE_MPI_F08
+      type(MPI_Comm), private :: comm = MPI_COMM_WORLD
+#   else
+      integer, private :: comm = MPI_COMM_WORLD
+#   endif
     integer, private :: me = 0
     integer, private :: nprocs = 1
 
@@ -95,65 +106,56 @@ module h5fort_h5xdmf_parallel
     ! zero padding
     integer            :: seq_digits = 5
     integer            :: rank_digits = 4
+    integer, private   :: geometry_precision = 8
+    integer, private   :: topology_precision = 8
 
     ! 属性リスト
     integer, private :: n_attrs = 0
-    type(t_h5xdmf_attr_info) :: attrs(MAX_ATTRS)
+    type(t_phdf5_attr_info) :: attrs(MAX_ATTRS)
 
   contains
-    procedure :: init => h5xdmf_init
-    procedure :: close => h5xdmf_close
+    procedure :: init  => phdf5_init
+    procedure :: close => phdf5_close
 
-    #:for node_kind in ['real32', 'real64']
-    #:for conn_kind in ['int32', 'int64']
-    procedure :: write_geom_ugrid_${node_kind}$_${conn_kind}$ => h5xdmf_write_geom_ugrid_${node_kind}$_${conn_kind}$
+    #:for node_kind in H5XDMF_REAL_KINDS
+    #:for conn_kind in H5XDMF_INT_KINDS
+    procedure :: write_geometry_ugrid_${node_kind}$_${conn_kind}$ => phdf5_write_geom_ugrid_${node_kind}$_${conn_kind}$
     #:endfor
-    procedure :: write_geom_polydata_${node_kind}$ => h5xdmf_write_geom_polydata_${node_kind}$
+    procedure :: write_geometry_polydata_${node_kind}$ => phdf5_geom_polydata_${node_kind}$
     #:endfor
-
+    ! Compatibility names from the former hand-written implementation.
+    procedure :: write_geometry_ugrid_i64 => phdf5_write_geom_ugrid_real64_int64
+    procedure :: write_geometry_ugrid_i32 => phdf5_write_geom_ugrid_real64_int32
+    procedure :: write_geometry_polydata  => phdf5_geom_polydata_real64
     generic   :: write_geometry_ugrid => &
-    #:for node_kind in ['real32', 'real64']
-    #:for conn_kind in ['int32', 'int64']
-      write_geom_ugrid_${node_kind}$_${conn_kind}$, &
-    #:endfor
-    #:endfor
+      ${', &\n      '.join(['write_geometry_ugrid_' + rkind + '_' + ikind for rkind in H5XDMF_REAL_KINDS for ikind in H5XDMF_INT_KINDS])}$
+    generic   :: write_geometry => &
+      ${', &\n      '.join(['write_geometry_ugrid_' + rkind + '_' + ikind for rkind in H5XDMF_REAL_KINDS for ikind in H5XDMF_INT_KINDS] + ['write_geometry_polydata_' + rkind for rkind in H5XDMF_REAL_KINDS])}$
 
-    generic   :: write_geometry_polydata => &
-    #:for node_kind in ['real32', 'real64']
-      write_geom_polydata_${node_kind}$, &
-    #:endfor
-
-    generic   :: write_geometry => write_geometry_ugrid, write_geometry_polydata
-
-    #:for _, kind in H5XDMF_WRITE_KINDS
+    #:for _, kind, xdmf_type, precision in H5XDMF_WRITE_KINDS
     #:for rank in H5XDMF_WRITE_RANKS
-    procedure :: write_point_${rank}$d_${kind} => h5xdmf_point_${rank}$d_${kind}$
-    procedure :: write_cell_${rank}$d_${kind}  => h5xdmf_cell_${rank}$d_${kind}$
+    procedure :: write_point_${rank}$d_${kind}$ => phdf5_point_${rank}$d_${kind}$
+    procedure :: write_cell_${rank}$d_${kind}$  => phdf5_cell_${rank}$d_${kind}$
     #:endfor
     #:endfor
 
+    ! Compatibility names for callers that used the specific bindings.
+    procedure :: write_point_1d => phdf5_point_1d_real64
+    procedure :: write_point_2d => phdf5_point_2d_real64
+    procedure :: write_cell_i32 => phdf5_cell_1d_int32
     generic   :: write_point_data => &
-    #:for _, kind in H5XDMF_WRITE_KINDS
-    #:for rank in H5XDMF_WRITE_RANKS
-      write_point_${rank}$d_${kind}$, &
-    #:endfor
-    #:endfor
-
+      ${', &\n      '.join(['write_point_' + str(rank) + 'd_' + kind for _, kind, _, _ in H5XDMF_WRITE_KINDS for rank in H5XDMF_WRITE_RANKS])}$
     generic   :: write_cell_data => &
-    #:for _, kind in H5XDMF_WRITE_KINDS
-    #:for rank in H5XDMF_WRITE_RANKS
-      write_cell_${rank}$d_${kind}$, &
-    #:endfor
-    #:endfor
+      ${', &\n      '.join(['write_cell_' + str(rank) + 'd_' + kind for _, kind, _, _ in H5XDMF_WRITE_KINDS for rank in H5XDMF_WRITE_RANKS])}$
 
     ! xdmf fragment
-    procedure :: add_point_attr_1d   => h5xdmf_xdmf_add_point_1d
-    procedure :: add_point_attr_2d   => h5xdmf_xdmf_add_point_2d
+    procedure :: add_point_attr_1d   => phdf5_xdmf_add_point_1d
+    procedure :: add_point_attr_2d   => phdf5_xdmf_add_point_2d
     generic   :: add_point_attr      => add_point_attr_1d, add_point_attr_2d
-    procedure :: add_cell_attr_i32   => h5xdmf_xdmf_add_cell_i32
+    procedure :: add_cell_attr_i32   => phdf5_xdmf_add_cell_i32
     generic   :: add_cell_attr       => add_cell_attr_i32
-    procedure :: write_fragment => h5xdmf_xdmf_write_fragment
-  end type t_h5xdmf_writer
+    procedure :: write_fragment => phdf5_xdmf_write_fragment
+  end type t_phdf5_writer
 
 contains
 
@@ -168,29 +170,33 @@ contains
   ! 注意: metadata グループ(属性)は廃止。全ランク対称になるよう非対称 I/O を排除。
   ! オフセット情報は meta_phdf5.txt に記録される。
   !====================================================================
-  subroutine h5xdmf_init(self)
-    class(t_h5xdmf_writer), intent(inout) :: self
+  subroutine phdf5_init(self)
+    class(t_phdf5_writer), intent(inout) :: self
     integer :: hdferr, mpi_err, r
     integer(HID_T) :: fapl_id, gid_base
     logical :: file_exists
     integer :: iexist   ! 0 or 1 for MPI_Bcast
-    integer :: ierr
-    integer(HID_T) :: obj_count
 
     ! Check flags and required fields
 #   define ABORT(msg,X) \
       write(error_unit,'(a)') 'PHDF5-ERROR detected in phdf5 init'; \
       write(error_unit,'(a)') msg; \
-      call MPI_Abort(MPI_COMM_WORLD, X, mpi_err)
+      call MPI_Abort(self%comm, X, mpi_err)
     if (is_file_initialized) then
       ABORT("This file is already initialized",2)
     end if
 #   undef ABORT
     is_file_initialized = .true.
 
+    call h5open_f(hdferr)
+    if (hdferr /= 0) then
+      write(error_unit,'(a)') 'ERROR phdf5_init: h5open_f failed'
+      call MPI_Abort(self%comm, 1, mpi_err)
+    end if
+
     ! Set MPI rank and size
-    call MPI_Comm_rank(MPI_COMM_WORLD, self%me, mpi_err)
-    call MPI_Comm_size(MPI_COMM_WORLD, self%nprocs, mpi_err)
+    call MPI_Comm_rank(self%comm, self%me, mpi_err)
+    call MPI_Comm_size(self%comm, self%nprocs, mpi_err)
 
     !------------------------------------------------------------------
     ! MPI_Allgather で各ランクの num_points / num_cells を収集
@@ -198,8 +204,8 @@ contains
     allocate(self%rank_np_(0:self%nprocs-1))
     allocate(self%rank_nc_(0:self%nprocs-1))
 
-    call MPI_Allgather(self%num_points, 1, MPI_INTEGER8, self%rank_np_,  1, MPI_INTEGER8, MPI_COMM_WORLD, mpi_err)
-    call MPI_Allgather(self%num_cells,  1, MPI_INTEGER8, self%rank_nc_,  1, MPI_INTEGER8, MPI_COMM_WORLD, mpi_err)
+    call MPI_Allgather(self%num_points, 1, MPI_INTEGER8, self%rank_np_,  1, MPI_INTEGER8, self%comm, mpi_err)
+    call MPI_Allgather(self%num_cells,  1, MPI_INTEGER8, self%rank_nc_,  1, MPI_INTEGER8, self%comm, mpi_err)
 
     ! offset と total を計算
     self%total_points = 0
@@ -223,16 +229,16 @@ contains
       self%output_type = 'polydata'
     case default
       if (self%me == 0) then
-        write(error_unit,'(a)') 'ERROR h5xdmf_init: unknown output_type: ' // trim(self%output_type)
+        write(error_unit,'(a)') 'ERROR phdf5_init: unknown output_type: ' // trim(self%output_type)
       end if
-      call MPI_Abort(MPI_COMM_WORLD, 1, mpi_err)
+      call MPI_Abort(self%comm, 1, mpi_err)
     end select
 
     !------------------------------------------------------------------
     ! MPI-IO ファイルアクセス Property List を作成
     !------------------------------------------------------------------
     call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, hdferr)
-    call h5pset_fapl_mpio_f(fapl_id, MPI_COMM_WORLD, MPI_INFO_NULL, hdferr)
+    call h5pset_fapl_mpio_f(fapl_id, self%comm, MPI_INFO_NULL, hdferr)
     ! 注意: coll_metadata_write / all_coll_metadata_ops は rank 0 のみが
     ! 属性を書く独立 I/O と競合して metadata checksum を破壊するため使わない。
     ! データセット書き込みの Collective I/O は xfer_id (H5FD_MPIO_COLLECTIVE_F) で行う。
@@ -249,7 +255,7 @@ contains
         iexist = 0
       end if
     end if
-    call MPI_Bcast(iexist, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, mpi_err)
+    call MPI_Bcast(iexist, 1, MPI_INTEGER, 0, self%comm, mpi_err)
     file_exists = (iexist == 1)
 
     !------------------------------------------------------------------
@@ -265,8 +271,8 @@ contains
     call h5pclose_f(fapl_id, hdferr)
 
     if (hdferr /= 0) then
-      write(error_unit,'(a,a)') 'ERROR h5xdmf_init: cannot open/create ', trim(self%h5_filepath)
-      call MPI_Abort(MPI_COMM_WORLD, 1, mpi_err)
+      write(error_unit,'(a,a)') 'ERROR phdf5_init: cannot open/create ', trim(self%h5_filepath)
+      call MPI_Abort(self%comm, 1, mpi_err)
     end if
 
     !------------------------------------------------------------------
@@ -291,13 +297,13 @@ contains
     !------------------------------------------------------------------
     call h5pcreate_f(H5P_DATASET_XFER_F, self%xfer_id, hdferr)
     call h5pset_dxpl_mpio_f(self%xfer_id, H5FD_MPIO_COLLECTIVE_F, hdferr)
-  end subroutine h5xdmf_init
+  end subroutine phdf5_init
 
   !====================================================================
   ! close: グループ・Property List・ファイルを閉じる
   !====================================================================
-  subroutine h5xdmf_close(self)
-    class(t_h5xdmf_writer), intent(inout) :: self
+  subroutine phdf5_close(self)
+    class(t_phdf5_writer), intent(inout) :: self
     integer :: hdferr
 
     call h5gclose_f(self%gid_geom,  hdferr)
@@ -316,71 +322,80 @@ contains
     if (allocated(self%rank_np_)) deallocate(self%rank_np_)
     if (allocated(self%rank_nc_)) deallocate(self%rank_nc_)
     is_file_initialized = .false.
-  end subroutine h5xdmf_close
+  end subroutine phdf5_close
 
   !====================================================================
   ! write_geometry_ugrid: nodes + connectivity -> /geometry
   !   connectivity はグローバル 0-indexed で渡す（呼び出し側が変換済み）。
   ! write_geometry_polydata: nodes のみ -> /geometry
   !====================================================================
-  #:for node_kind in ['real32', 'real64']
-  #:for conn_kind in ['int32', 'int64']
-  subroutine h5xdmf_write_geom_ugrid_${node_kind}$_${conn_kind}$(self, nodes, connectivity)
-    class(t_h5xdmf_writer), intent(inout) :: self
+  #:for node_kind in H5XDMF_REAL_KINDS
+  #:for conn_kind in H5XDMF_INT_KINDS
+  subroutine phdf5_write_geom_ugrid_${node_kind}$_${conn_kind}$(self, nodes, connectivity)
+    class(t_phdf5_writer), intent(inout) :: self
     real(${node_kind}$),   intent(in) :: nodes(:, :)
     integer(${conn_kind}$), intent(in) :: connectivity(:, :)
 
-    @:CHECK_SHAPE(nodes, [3, self%num_points], "[h5fortran/H5XDMF] Array `nodes` has incorrect shape")
-    @:CHECK_SHAPE(connectivity, [8, self%num_cells], "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape")
+    @:CHECK_SHAPE(nodes, [3_int64, self%num_points], "[h5fortran/H5XDMF] Array `nodes` has incorrect shape")
+    @:CHECK_SHAPE(connectivity, [8_int64, self%num_cells], "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape")
     ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
-    call write_slab_${node_kind}$_2d_(self%gid_geom, 'nodes', 3_int64, &
-                            self%num_points, self%offset_points, self%total_points, &
-                            nodes, self%xfer_id)
+    call write_slab_${node_kind}$_2d_(self%gid_geom, 'nodes', &
+      [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
 
     ! connectivity: グローバル 0-indexed をそのまま書き込む
-    call write_slab_${conn_kind}$_2d_(self%gid_geom, 'connectivity', 8_int64, &
-                            self%num_cells, self%offset_cells, self%total_cells, &
-                            connectivity, self%xfer_id)
-  end subroutine h5xdmf_write_geom_ugrid_${node_kind}$_${conn_kind}$
+    call write_slab_${conn_kind}$_2d_(self%gid_geom, 'connectivity', &
+      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
+    self%geometry_precision = ${H5XDMF_PRECISION[node_kind]}$
+    self%topology_precision = ${H5XDMF_PRECISION[conn_kind]}$
+  end subroutine phdf5_write_geom_ugrid_${node_kind}$_${conn_kind}$
 
   #:endfor
-  subroutine h5xdmf_geom_polydata_${node_kind}$(self, nodes)
-    class(t_h5xdmf_writer), intent(inout) :: self
-    real(${node_kind}$), intent(in) :: nodes(3, self%num_points)
+  subroutine phdf5_geom_polydata_${node_kind}$(self, nodes)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(${node_kind}$), intent(in) :: nodes(:, :)
 
-    call write_slab_${node_kind}$_2d_(self%gid_geom, 'nodes', 3_int64, &
-                            self%num_points, self%offset_points, self%total_points, &
-                            nodes, self%xfer_id)
-  end subroutine h5xdmf_geom_polydata_${node_kind}$
+    @:CHECK_SHAPE(nodes, [3_int64, self%num_points], "[h5fortran/H5XDMF] Array `nodes` has incorrect shape")
+    call write_slab_${node_kind}$_2d_(self%gid_geom, 'nodes', &
+      [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
+    self%geometry_precision = ${H5XDMF_PRECISION[node_kind]}$
+  end subroutine phdf5_geom_polydata_${node_kind}$
 
   #:endfor
 
   !====================================================================
   ! write_point_data/write_cell_data
   !====================================================================
-  #:for irflag, kind in H5XDMF_WRITE_KINDS
+  #:for irflag, kind, xdmf_type, precision in H5XDMF_WRITE_KINDS
   #:for rank in H5XDMF_WRITE_RANKS
-  subroutine h5xdmf_point_${rank}$d_${kind}$(self, data, field_name)
-    class(t_h5xdmf_writer), intent(inout) :: self
+  subroutine phdf5_point_${rank}$d_${kind}$(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
     ${irflag}$(${kind}$), intent(in) :: data(${', '.join([':']*rank)}$)
     character(len=*), intent(in) :: field_name
 
+    if (int(size(data, ${rank}$), int64) /= self%num_points) then
+      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+    end if
     call write_slab_${kind}$_${rank}$d_(&
       self%gid_pdata, trim(field_name), &
       [${', '.join(['int(size(data, ' + str(i) + '), int64)' for i in range(1, rank+1)])}$], &
       self%offset_points, self%total_points, &
       data, self%xfer_id&
     )
-  end subroutine h5xdmf_point_${rank}$d_${kind}$
+    call register_attribute_(self, field_name, 'Node', '${xdmf_type}$', ${precision}$, &
+      self%total_points, ${'1' if rank == 1 else 'size(data, 1)'}$)
+  end subroutine phdf5_point_${rank}$d_${kind}$
 
-  subroutine h5xdmf_cell_${rank}$d_${kind}$(self, data, field_name)
-    class(t_h5xdmf_writer), intent(inout) :: self
+  subroutine phdf5_cell_${rank}$d_${kind}$(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
     ${irflag}$(${kind}$), intent(in) :: data(${', '.join([':']*rank)}$)
     character(len=*),  intent(in) :: field_name
 
     if (self%gid_cdata < 0) then
-      write(error_unit,'(a)') 'ERROR h5xdmf_cell_${rank}$d_${kind}$: cell_data group not open'
+      write(error_unit,'(a)') 'ERROR phdf5_cell_${rank}$d_${kind}$: cell_data group not open'
       stop 1
+    end if
+    if (int(size(data, ${rank}$), int64) /= self%num_cells) then
+      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
     end if
 
     call write_slab_${kind}$_${rank}$d_(&
@@ -389,8 +404,10 @@ contains
       self%offset_cells, self%total_cells, &
       data, self%xfer_id&
     )
+    call register_attribute_(self, field_name, 'Cell', '${xdmf_type}$', ${precision}$, &
+      self%total_cells, ${'1' if rank == 1 else 'size(data, 1)'}$)
 
-  end subroutine h5xdmf_cell_${rank}$d_${kind}$
+  end subroutine phdf5_cell_${rank}$d_${kind}$
 
   #:endfor
   #:endfor
@@ -407,8 +424,12 @@ contains
   !   ファイルデータスペース: H5S_SELECT_NONE を選択
   !   メモリデータスペース : H5S_NULL (要素なし)
   !   -> 全ランクが Collective I/O に参加しつつデータ転送なし
+  !
+  ! This helper intentionally creates fixed-size datasets to preserve the
+  ! current XDMF layout.  A future time-series/misc writer based on
+  ! H5S_UNLIMITED should use a separate create/extend path.
   !====================================================================
-  #:for irflag, kind in H5XDMF_WRITE_KINDS
+  #:for irflag, kind, xdmf_type, precision in H5XDMF_WRITE_KINDS
   #:for rank in H5XDMF_WRITE_RANKS
   subroutine write_slab_${kind}$_${rank}$d_(gid, dname, dims, offset, n_total, data, xfer_id)
     integer(HID_T),     intent(in) :: gid, xfer_id
@@ -435,12 +456,8 @@ contains
     #:for i in range(1, rank)
     dims_m(${i}$) = int(dims(${i}$), HSIZE_T)
     #:endfor
-    dims_m(${rank}$) = int(maxval(dims(${rank}$), 1_int64), HSIZE_T)
-    if (n > 0) then
-      ! FIXME: This algorithm may not be correct if rank > 3
-      #:if rank >= 3
-      #error "Rank ${rank}$ is not supported in write_slab_${kind}$_${rank}$d_"
-      #:endif
+    dims_m(${rank}$) = int(max(dims(${rank}$), 1_int64), HSIZE_T)
+    if (dims(${rank}$) > 0_int64) then
       #:for i in range(1, rank)
       hstart(${i}$) = int(0, HSIZE_T)
       hcount(${i}$) = int(dims(${i}$), HSIZE_T)
@@ -469,86 +486,86 @@ contains
   #:endfor
   #:endfor
 
-  ! FIXME: Build attributes from the `field_name` registered begore
+  subroutine register_attribute_(self, field_name, center, num_type, precision, n_total, ncomp, update_existing)
+    class(t_phdf5_writer), intent(inout) :: self
+    character(len=*), intent(in) :: field_name, center, num_type
+    integer, intent(in) :: precision, ncomp
+    integer(int64), intent(in) :: n_total
+    logical, intent(in), optional :: update_existing
+    integer :: i, idx
+    logical :: update
+
+    update = .true.
+    if (present(update_existing)) update = update_existing
+    idx = 0
+    do i = 1, self%n_attrs
+      if (trim(self%attrs(i)%name) == trim(field_name) .and. &
+          trim(self%attrs(i)%center) == trim(center)) then
+        idx = i
+        exit
+      end if
+    end do
+    if (idx > 0 .and. .not. update) return
+    if (idx == 0) then
+      if (self%n_attrs >= MAX_ATTRS) then
+        error stop "[h5fortran/H5XDMF] too many attributes"
+      end if
+      self%n_attrs = self%n_attrs + 1
+      idx = self%n_attrs
+    end if
+
+    associate(a => self%attrs(idx))
+      a%name = trim(field_name)
+      a%center = trim(center)
+      a%num_type = trim(num_type)
+      a%precision = precision
+      a%n_total = n_total
+      a%ncomp = ncomp
+      select case (ncomp)
+      case (1)
+        a%attr_type = 'Scalar'
+      case (3)
+        a%attr_type = 'Vector'
+      case (6)
+        a%attr_type = 'Tensor6'
+      case (9)
+        a%attr_type = 'Tensor'
+      case default
+        error stop "[h5fortran/H5XDMF] ncomp must be 1, 3, 6, or 9"
+      end select
+    end associate
+  end subroutine register_attribute_
+
   ! --------------------------------------------------------------------
   ! add_point_attr_1d: スカラー点属性を登録
   ! --------------------------------------------------------------------
-  subroutine h5xdmf_xdmf_add_point_1d(self, field_name)
-    class(t_h5xdmf_writer), intent(inout) :: self
+  subroutine phdf5_xdmf_add_point_1d(self, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
     character(len=*), intent(in) :: field_name
 
-    self%n_attrs = self%n_attrs + 1
-    if (self%n_attrs > MAX_ATTRS) then
-      write(error_unit,'(a)') 'ERROR h5xdmf_xdmf: too many attributes'
-      stop 1
-    end if
-    associate(a => self%attrs(self%n_attrs))
-      a%name      = trim(field_name)
-      a%attr_type = 'Scalar'
-      a%center    = 'Node'
-      a%num_type  = 'Float'
-      a%precision = 8
-      a%n_total   = self%total_points
-      a%ncomp     = 1
-    end associate
-  end subroutine h5xdmf_xdmf_add_point_1d
+    call register_attribute_(self, field_name, 'Node', 'Float', 8, self%total_points, 1, .false.)
+  end subroutine phdf5_xdmf_add_point_1d
 
   ! --------------------------------------------------------------------
   ! add_point_attr_2d: ベクトル / テンソル点属性を登録
   ! --------------------------------------------------------------------
-  subroutine h5xdmf_xdmf_add_point_2d(self, ncomp, field_name)
-    class(t_h5xdmf_writer), intent(inout) :: self
+  subroutine phdf5_xdmf_add_point_2d(self, ncomp, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
     integer,          intent(in) :: ncomp
     character(len=*), intent(in) :: field_name
 
-    self%n_attrs = self%n_attrs + 1
-    if (self%n_attrs > MAX_ATTRS) then
-      write(error_unit,'(a)') 'ERROR h5xdmf_xdmf: too many attributes'
-      stop 1
-    end if
-    associate(a => self%attrs(self%n_attrs))
-      a%name    = trim(field_name)
-      a%center  = 'Node'
-      a%num_type  = 'Float'
-      a%precision = 8
-      a%n_total = self%total_points
-      a%ncomp   = ncomp
-      if (ncomp == 1) then
-        a%attr_type = 'Scalar'
-      else if (ncomp == 3) then
-        a%attr_type = 'Vector'
-      else if (ncomp == 6) then
-        a%attr_type = 'Tensor6'
-      else if (ncomp == 9) then
-        a%attr_type = 'Tensor'
-      else
-        write(error_unit,'(a,i0,a)') 'ERROR h5xdmf_xdmf: unsupported ncomp for point attribute: ', ncomp, ' (only 1,3,6,9 supported)'
-      end if
-    end associate
-  end subroutine h5xdmf_xdmf_add_point_2d
+    call register_attribute_(self, field_name, 'Node', 'Float', 8, self%total_points, ncomp, .false.)
+  end subroutine phdf5_xdmf_add_point_2d
 
   ! --------------------------------------------------------------------
   ! add_cell_attr_i32: int32 スカラーセル属性を登録
   ! --------------------------------------------------------------------
-  subroutine h5xdmf_xdmf_add_cell_i32(self, field_name)
-    class(t_h5xdmf_writer), intent(inout) :: self
+  subroutine phdf5_xdmf_add_cell_i32(self, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
     character(len=*), intent(in) :: field_name
 
-    self%n_attrs = self%n_attrs + 1
-    if (self%n_attrs > MAX_ATTRS) then
-      write(error_unit,'(a)') 'ERROR h5xdmf_xdmf: too many attributes'
-      stop 1
-    end if
-    associate(a => self%attrs(self%n_attrs))
-      a%name      = trim(field_name)
-      a%attr_type = 'Scalar'
-      a%center    = 'Cell'
-      a%num_type  = 'Int'
-      a%precision = 4
-      a%n_total   = self%total_cells
-      a%ncomp     = 1
-    end associate
-  end subroutine h5xdmf_xdmf_add_cell_i32
+    call register_attribute_(self, field_name, 'Cell', 'Int', 4, self%total_cells, 1, .false.)
+  end subroutine phdf5_xdmf_add_cell_i32
 
   ! --------------------------------------------------------------------
   ! write_fragment: .xdmf.part ファイルを直接書く（rank 0 のみ呼ぶ）
@@ -556,8 +573,8 @@ contains
   ! グローバル dataset を直接参照する。
   ! Topology, Geometry, Attribute のみを含む（Grid タグは output_xdmf が付与）。
   ! --------------------------------------------------------------------
-  subroutine h5xdmf_xdmf_write_fragment(self)
-    class(t_h5xdmf_writer), intent(in) :: self
+  subroutine phdf5_xdmf_write_fragment(self)
+    class(t_phdf5_writer), intent(in) :: self
     character(len=512) :: part_path, h5_rel_path, group_prefix
     character(len=30) :: time_str
     integer :: fid, i
@@ -583,7 +600,8 @@ contains
     ! Topology
     if (trim(self%output_type) == 'ugrid') then
       write(fid,'(a,i0,a)')    '<Topology TopologyType="Hexahedron" NumberOfElements="', self%total_cells, '">'
-      write(fid,'(a,i0,a)')    '  <DataItem Format="HDF" NumberType="Int" Precision="8" Dimensions="', self%total_cells, ' 8">'
+      write(fid,'(a,i0,a,i0,a)') '  <DataItem Format="HDF" NumberType="Int" Precision="', &
+        self%topology_precision, '" Dimensions="', self%total_cells, ' 8">'
       write(fid,'(a,a,a,a,a)') '    ', trim(h5_rel_path), ':/', trim(group_prefix), '/geometry/connectivity'
       write(fid,'(a)')         '  </DataItem>'
       write(fid,'(a)')         '</Topology>'
@@ -594,14 +612,15 @@ contains
     ! FIXME: Precision を判定する
     ! Geometry
     write(fid,'(a)')         '<Geometry GeometryType="XYZ">'
-    write(fid,'(a,i0,a)')    '  <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="', self%total_points, ' 3">'
+    write(fid,'(a,i0,a,i0,a)') '  <DataItem Format="HDF" NumberType="Float" Precision="', &
+      self%geometry_precision, '" Dimensions="', self%total_points, ' 3">'
     write(fid,'(a,a,a,a,a)') '    ', trim(h5_rel_path), ':/', trim(group_prefix), '/geometry/nodes'
     write(fid,'(a)')         '  </DataItem>'
     write(fid,'(a)')         '</Geometry>'
 
     ! Attributes
     do i = 1, self%n_attrs
-      call write_global_attribute_(self%attrs(i))
+      call attr_(self%attrs(i))
     end do
 
     close(fid)
@@ -618,8 +637,8 @@ contains
       s = adjustl(s)
     end function int_fmt_
 
-    subroutine write_global_attribute_(attr)
-      type(t_h5xdmf_attr_info), intent(in) :: attr
+    subroutine attr_(attr)
+      type(t_phdf5_attr_info), intent(in) :: attr
       character(len=32) :: data_group
 
       if (trim(attr%center) == 'Node') then
@@ -646,7 +665,7 @@ contains
         trim(group_prefix), '/', trim(data_group), '/' // trim(attr%name)
       write(fid,'(a)') '  </DataItem>'
       write(fid,'(a)') '</Attribute>'
-    end subroutine write_global_attribute_
-  end subroutine h5xdmf_xdmf_write_fragment
+    end subroutine attr_
+  end subroutine phdf5_xdmf_write_fragment
 
-end module h5fort_h5xdmf_parallel
+end module h5fort_parallel_hdf5_xdmf

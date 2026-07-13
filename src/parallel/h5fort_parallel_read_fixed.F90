@@ -1,7 +1,7 @@
 ! DO NOT EDIT — generated from src/fypp/parallel/h5fort_parallel_read_fixed.fypp
-! To regenerate: scripts/generate_fypp.sh
+! To regenerate: src/fypp/generate_fypp.sh
 ! 固定長（非allocatable）配列向け。allocatable版を呼んでから形状チェック・コピーする。
-#include "check_shape_and_copy.inc"
+
 module h5fort_parallel_read_fixed
   use hdf5
   use, intrinsic :: iso_fortran_env

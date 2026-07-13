@@ -1,119 +1,89 @@
 # h5fortran の使い方
 
-## 共通の前準備
+## Serial: OOP API
 
-HDF5 の初期化・終了と、ファイルの open/close は HDF5 ライブラリの関数を直接呼びます。
-h5fortran の関数はファイル ID (`file_id`) を受け取るだけです。
+通常は `t_h5fort_serial` を使うと、HDF5 の file ID と直前のエラーがオブジェクト内にまとまります。
 
 ```fortran
-use hdf5
 use h5fort
+use iso_fortran_env, only: real64
 
-integer :: hdferr
-integer(hid_t) :: file_id
+type(t_h5fort_serial) :: file
+real(real64) :: values(3) = [1, 2, 3]
+real(real64), allocatable :: restored(:)
 
-call h5open_f(hdferr)                                          ! HDF5 初期化
+file%f_name = "result.h5"
+call file%open(H5FORTRAN_FORCE_WRITE)
+call file%write("/result/value", values, units="m/s")
+if (file%hdferr /= 0) error stop "write failed"
+call file%close()
 
-call h5fcreate_f("out.h5", H5F_ACC_TRUNC_F, file_id, hdferr)  ! 新規作成
-! ... 書き込み処理 ...
-call h5fclose_f(file_id, hdferr)
-
-call h5fopen_f("out.h5", H5F_ACC_RDONLY_F, file_id, hdferr)   ! 読み込み
-! ... 読み込み処理 ...
-call h5fclose_f(file_id, hdferr)
-
-call h5close_f(hdferr)                                         ! HDF5 終了
+call file%open(H5FORTRAN_READ_ONLY)
+call file%read("/result/value", restored)
+if (file%hdferr /= 0) error stop "read failed"
+call file%close()
 ```
 
----
+`open()` の mode は次のとおりです。
 
-## Serial HDF5
+- `H5FORTRAN_FORCE_WRITE`: 新規作成し、既存ファイルを切り詰める
+- `H5FORTRAN_READ_ONLY`: 読み込み専用で開く
+- 省略: 読み書き可能で既存ファイルを開く
 
-### 書き込み
+`write` は中間 group を自動作成します。既存 dataset を置き換える場合は `mode=H5FORTRAN_FORCE_WRITE` を渡します。`attrs` には `t_hdf5_attr` の配列、`units` には文字列を指定できます。
+
+固定サイズ配列へ読むときは `read_fixed` を使います。dataset と shape が違う場合は `hdferr` が非ゼロになります。logical 配列も利用できます。
 
 ```fortran
-! var はスカラー〜4次元配列、型は real64/real32/integer(int32)/logical/character
-call h5fort_swrite(file_id, "/dataset_path", var, hdferr)
+logical :: flags(2, 3)
+call file%read_fixed("/flags", flags)
 ```
 
-### 読み込み（アロケータブル配列）
+## Serial: 手続き API
+
+既存コードが HDF5 file ID を管理している場合は、低水準 API を直接呼べます。
 
 ```fortran
-real(real64), allocatable :: var(:, :)
-call h5fort_sread(file_id, "/dataset_path", var, hdferr)
-! var は自動的にアロケートされる
+call h5fort_swrite(file_id, "/value", values, hdferr)
+call h5fort_sread(file_id, "/value", restored, hdferr)
+call h5fort_sread_fixed(file_id, "/flags", flags, hdferr)
 ```
 
-### 読み込み（固定サイズ配列）
+## Parallel: OOP API
+
+MPI 初期化後、全 rank が同じ順序で `open` / `write` / `read` / `close` を呼びます。配列の最終次元が rank 間で分割され、それ以外の次元は全 rank で一致している必要があります。
 
 ```fortran
-real(real64) :: var(100, 3)
-call h5fort_sread_fixed(file_id, "/dataset_path", var, hdferr)
-```
-
-### オブジェクト指向インターフェース
-
-```fortran
-type(t_h5fort_serial) :: h5s
-call h5s%write(file_id, "/dataset_path", var, hdferr)
-call h5s%read(file_id, "/dataset_path", var, hdferr)
-call h5s%read_fixed(file_id, "/dataset_path", var, hdferr)
-```
-
----
-
-## Parallel HDF5
-
-MPI で並列に I/O を行います。各ランクがローカルの配列を持ち、h5fortran が集約して HDF5 に保存します。
-
-### ファイル open 時の並列設定
-
-```fortran
-use hdf5
+use h5fort
 use mpi
-use h5fort
+use iso_fortran_env, only: real64
 
-integer :: hdferr, ierr
-integer(hid_t) :: file_id, fapl_id
+type(t_h5fort_parallel) :: file
+real(real64) :: local_values(10)
+real(real64), allocatable :: restored(:)
 
 call MPI_Init(ierr)
-call h5open_f(hdferr)
+file%f_name = "parallel.h5"
+call file%open(H5FORTRAN_FORCE_WRITE)
+call file%write("/value", local_values)
+call file%close()
 
-call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, hdferr)
-call h5pset_fapl_mpio_f(fapl_id, MPI_COMM_WORLD, MPI_INFO_NULL, hdferr)
-call h5fcreate_f("parallel.h5", H5F_ACC_TRUNC_F, file_id, hdferr, access_prp=fapl_id)
-call h5pclose_f(fapl_id, hdferr)
+call file%open(H5FORTRAN_READ_ONLY)
+call file%read("/value", restored)
+call file%close()
+call MPI_Finalize(ierr)
 ```
 
-### 書き込み・読み込み
+手続き API は `h5fort_pwrite`、`h5fort_pread`、`h5fort_pread_fixed` です。Parallel の文字列 I/O は現在未実装です。
 
-```fortran
-type(t_h5fort_parallel) :: h5fp
+## Parallel の保存形式
 
-! 書き込み（各ランクが異なるサイズの配列を書ける）
-call h5fp%write(file_id, "/data", local_array, hdferr)
+例えば `/value` は次のように保存されます。
 
-! 読み込み（アロケータブル）
-call h5fp%read(file_id, "/data", local_array_read, hdferr)
-
-! 読み込み（固定サイズ）
-call h5fp%read_fixed(file_id, "/data", local_array_fixed, hdferr)
+```text
+/value/data       全 rank のデータ
+/value/__count__  rank ごとの分割要素数
+/value/__offset__ rank ごとの開始位置
 ```
 
-### HDF5 内部のデータ構造
-
-並列データは以下の構造で保存されます（`/data` の場合）:
-
-```
-/data/__data__    [total_count]        全ランク分のデータ
-/data/__count__   [nprocs]             各ランクの要素数
-/data/__offset__  [nprocs]             各ランクの先頭オフセット
-```
-
-データセット名 `__count__` / `__offset__` はコンパイル時マクロで変更できます:
-
-```fortran
-! h5fort_config.inc または前処理オプションで指定
-#define H5FORT_DSET_COUNT_DNAME  "count"
-#define H5FORT_DSET_OFFSET_DNAME "offset"
-```
+詳細な型・rank とエラー契約は [SPEC.md](SPEC.md) を参照してください。

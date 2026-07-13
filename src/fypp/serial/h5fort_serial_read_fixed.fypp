@@ -1,5 +1,5 @@
 ! DO NOT EDIT — generated from src/fypp/serial/h5fort_serial_read_fixed.fypp
-! To regenerate: scripts/generate_fypp.sh
+! To regenerate: src/fypp/generate_fypp.sh
 ! 固定長（非allocatable）配列向け。Fortranのジェネリック解決はallocatable属性を
 ! 区別しないため、hdf5_read とは別インターフェースとして提供する。
 #:include "common.fypp"
@@ -11,16 +11,19 @@ module h5fort_serial_read_fixed
   implicit none
   private
 
-#:for kname, ftype in KINDS
+#:for kname, ftype, h5type in KINDS
   #:for rank in RANKS
   public :: h5fort_read_${kname}$_${rank}$d_fixed
   #:endfor
+#:endfor
+#:for rank in RANKS
+  public :: h5fort_read_lgc_${rank}$d_fixed
 #:endfor
 
 contains
 
 #:include "check_shape_and_copy.fypp"
-#:for kname, ftype in KINDS
+#:for kname, ftype, h5type in KINDS
   #:for rank in RANKS
   subroutine h5fort_read_${kname}$_${rank}$d_fixed(file_id, dset_path, array, hdferr)
     integer(hid_t),   intent(in)  :: file_id
@@ -34,6 +37,20 @@ contains
   end subroutine h5fort_read_${kname}$_${rank}$d_fixed
 
   #:endfor
+#:endfor
+
+#:for rank in RANKS
+  subroutine h5fort_read_lgc_${rank}$d_fixed(file_id, dset_path, array, hdferr)
+    integer(hid_t),   intent(in)  :: file_id
+    character(len=*), intent(in)  :: dset_path
+    logical,          intent(out) :: array(${', '.join([':']*rank)}$)
+    integer,          intent(out) :: hdferr
+    logical, allocatable :: tmp(${', '.join([':']*rank)}$)
+    call h5fort_read_lgc_${rank}$d(file_id, dset_path, tmp, hdferr)
+    if (hdferr /= 0) return
+    @:CHECK_SHAPE_AND_COPY(serial, tmp, array)
+  end subroutine h5fort_read_lgc_${rank}$d_fixed
+
 #:endfor
 #:del CHECK_SHAPE_AND_COPY
 

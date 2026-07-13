@@ -1,5 +1,6 @@
 ! DO NOT EDIT — generated from src/fypp/parallel/h5fort_parallel_write.fypp
-! To regenerate: scripts/generate_fypp.sh
+! To regenerate: src/fypp/generate_fypp.sh
+
 #include "h5fort_config.inc"
 #include "h5fort_parallel.inc"
 module h5fort_parallel_write
@@ -19,6 +20,22 @@ module h5fort_parallel_write
   character(len=*), parameter :: OFFSET_DATASET_NAME = H5FORT_DSET_OFFSET_DNAME
 
 contains
+
+  subroutine validate_nonpartition_dims(dims, hdferr)
+    integer(int64), intent(in) :: dims(:)
+    integer, intent(out) :: hdferr
+    integer(int64) :: min_dims(size(dims)), max_dims(size(dims))
+    integer :: mpi_err
+
+    hdferr = 0
+    call MPI_Allreduce(dims, min_dims, size(dims), MPI_INTEGER8, MPI_MIN, MPI_COMM_WORLD, mpi_err)
+    if (mpi_err /= MPI_SUCCESS) then
+      hdferr = -1
+      return
+    end if
+    call MPI_Allreduce(dims, max_dims, size(dims), MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpi_err)
+    if (mpi_err /= MPI_SUCCESS .or. any(min_dims /= max_dims)) hdferr = -1
+  end subroutine validate_nonpartition_dims
 
   subroutine begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
     integer(hid_t), intent(in) :: file_id
@@ -554,10 +571,18 @@ contains
 
     integer(int64), allocatable :: count_(:), offset_(:)
     integer(int64) :: ncomp
+    integer(int64) :: nonpartition_dims(1)
     integer(int64) :: nlocal, ntotal, local_offset
     integer(hid_t) :: group_id, xfer_id
 
     ncomp = int(size(array, 1), int64)
+    nonpartition_dims = [ncomp]
+    call validate_nonpartition_dims(nonpartition_dims, hdferr)
+    if (hdferr /= 0) then
+      write(error_unit, '(a,a)') "[h5fort/parallel/write] ERROR: non-partition dimensions differ between ranks: ", &
+        trim(dset_path)
+      return
+    end if
     nlocal = int(size(array, 2), int64)
     call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
     if (hdferr /= 0) return
@@ -575,11 +600,19 @@ contains
     integer(int64), allocatable :: count_(:), offset_(:)
     integer(int64) :: n1
     integer(int64) :: n2
+    integer(int64) :: nonpartition_dims(2)
     integer(int64) :: nlocal, ntotal, local_offset
     integer(hid_t) :: group_id, xfer_id
 
     n1 = int(size(array, 1), int64)
     n2 = int(size(array, 2), int64)
+    nonpartition_dims = [n1, n2]
+    call validate_nonpartition_dims(nonpartition_dims, hdferr)
+    if (hdferr /= 0) then
+      write(error_unit, '(a,a)') "[h5fort/parallel/write] ERROR: non-partition dimensions differ between ranks: ", &
+        trim(dset_path)
+      return
+    end if
     nlocal = int(size(array, 3), int64)
     call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
     if (hdferr /= 0) return
@@ -598,12 +631,20 @@ contains
     integer(int64) :: n1
     integer(int64) :: n2
     integer(int64) :: n3
+    integer(int64) :: nonpartition_dims(3)
     integer(int64) :: nlocal, ntotal, local_offset
     integer(hid_t) :: group_id, xfer_id
 
     n1 = int(size(array, 1), int64)
     n2 = int(size(array, 2), int64)
     n3 = int(size(array, 3), int64)
+    nonpartition_dims = [n1, n2, n3]
+    call validate_nonpartition_dims(nonpartition_dims, hdferr)
+    if (hdferr /= 0) then
+      write(error_unit, '(a,a)') "[h5fort/parallel/write] ERROR: non-partition dimensions differ between ranks: ", &
+        trim(dset_path)
+      return
+    end if
     nlocal = int(size(array, 4), int64)
     call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
     if (hdferr /= 0) return
@@ -638,10 +679,18 @@ contains
 
     integer(int64), allocatable :: count_(:), offset_(:)
     integer(int64) :: ncomp
+    integer(int64) :: nonpartition_dims(1)
     integer(int64) :: nlocal, ntotal, local_offset
     integer(hid_t) :: group_id, xfer_id
 
     ncomp = int(size(array, 1), int64)
+    nonpartition_dims = [ncomp]
+    call validate_nonpartition_dims(nonpartition_dims, hdferr)
+    if (hdferr /= 0) then
+      write(error_unit, '(a,a)') "[h5fort/parallel/write] ERROR: non-partition dimensions differ between ranks: ", &
+        trim(dset_path)
+      return
+    end if
     nlocal = int(size(array, 2), int64)
     call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
     if (hdferr /= 0) return
@@ -659,11 +708,19 @@ contains
     integer(int64), allocatable :: count_(:), offset_(:)
     integer(int64) :: n1
     integer(int64) :: n2
+    integer(int64) :: nonpartition_dims(2)
     integer(int64) :: nlocal, ntotal, local_offset
     integer(hid_t) :: group_id, xfer_id
 
     n1 = int(size(array, 1), int64)
     n2 = int(size(array, 2), int64)
+    nonpartition_dims = [n1, n2]
+    call validate_nonpartition_dims(nonpartition_dims, hdferr)
+    if (hdferr /= 0) then
+      write(error_unit, '(a,a)') "[h5fort/parallel/write] ERROR: non-partition dimensions differ between ranks: ", &
+        trim(dset_path)
+      return
+    end if
     nlocal = int(size(array, 3), int64)
     call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
     if (hdferr /= 0) return
@@ -682,12 +739,20 @@ contains
     integer(int64) :: n1
     integer(int64) :: n2
     integer(int64) :: n3
+    integer(int64) :: nonpartition_dims(3)
     integer(int64) :: nlocal, ntotal, local_offset
     integer(hid_t) :: group_id, xfer_id
 
     n1 = int(size(array, 1), int64)
     n2 = int(size(array, 2), int64)
     n3 = int(size(array, 3), int64)
+    nonpartition_dims = [n1, n2, n3]
+    call validate_nonpartition_dims(nonpartition_dims, hdferr)
+    if (hdferr /= 0) then
+      write(error_unit, '(a,a)') "[h5fort/parallel/write] ERROR: non-partition dimensions differ between ranks: ", &
+        trim(dset_path)
+      return
+    end if
     nlocal = int(size(array, 4), int64)
     call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
     if (hdferr /= 0) return
@@ -724,11 +789,19 @@ contains
 
     integer(int64), allocatable :: count_(:), offset_(:)
     integer(int64) :: ncomp
+    integer(int64) :: nonpartition_dims(1)
     integer(int64) :: nlocal, ntotal, local_offset
     integer(hid_t) :: group_id, xfer_id
     integer(hid_t) :: h5t_i32
 
     ncomp = int(size(array, 1), int64)
+    nonpartition_dims = [ncomp]
+    call validate_nonpartition_dims(nonpartition_dims, hdferr)
+    if (hdferr /= 0) then
+      write(error_unit, '(a,a)') "[h5fort/parallel/write] ERROR: non-partition dimensions differ between ranks: ", &
+        trim(dset_path)
+      return
+    end if
     nlocal = int(size(array, 2), int64)
     call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
     if (hdferr /= 0) return
@@ -747,12 +820,20 @@ contains
     integer(int64), allocatable :: count_(:), offset_(:)
     integer(int64) :: n1
     integer(int64) :: n2
+    integer(int64) :: nonpartition_dims(2)
     integer(int64) :: nlocal, ntotal, local_offset
     integer(hid_t) :: group_id, xfer_id
     integer(hid_t) :: h5t_i32
 
     n1 = int(size(array, 1), int64)
     n2 = int(size(array, 2), int64)
+    nonpartition_dims = [n1, n2]
+    call validate_nonpartition_dims(nonpartition_dims, hdferr)
+    if (hdferr /= 0) then
+      write(error_unit, '(a,a)') "[h5fort/parallel/write] ERROR: non-partition dimensions differ between ranks: ", &
+        trim(dset_path)
+      return
+    end if
     nlocal = int(size(array, 3), int64)
     call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
     if (hdferr /= 0) return
@@ -772,6 +853,7 @@ contains
     integer(int64) :: n1
     integer(int64) :: n2
     integer(int64) :: n3
+    integer(int64) :: nonpartition_dims(3)
     integer(int64) :: nlocal, ntotal, local_offset
     integer(hid_t) :: group_id, xfer_id
     integer(hid_t) :: h5t_i32
@@ -779,6 +861,13 @@ contains
     n1 = int(size(array, 1), int64)
     n2 = int(size(array, 2), int64)
     n3 = int(size(array, 3), int64)
+    nonpartition_dims = [n1, n2, n3]
+    call validate_nonpartition_dims(nonpartition_dims, hdferr)
+    if (hdferr /= 0) then
+      write(error_unit, '(a,a)') "[h5fort/parallel/write] ERROR: non-partition dimensions differ between ranks: ", &
+        trim(dset_path)
+      return
+    end if
     nlocal = int(size(array, 4), int64)
     call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
     if (hdferr /= 0) return

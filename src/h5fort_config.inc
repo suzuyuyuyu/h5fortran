@@ -1,6 +1,3 @@
-#define H5FORT_SERIAL
-#define H5FORT_PARALLEL
-
 #ifndef H5FORT_DSET_COUNT_DNAME
 # define H5FORT_DSET_COUNT_DNAME "__count__"
 #endif

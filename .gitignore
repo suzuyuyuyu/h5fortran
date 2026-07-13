@@ -1,6 +1,8 @@
 debug/
 obj/
 build/
+/build-*/
+/install-*/
 include/
 lib/
 dist/

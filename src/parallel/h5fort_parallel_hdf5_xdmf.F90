@@ -1,111 +1,7 @@
-!------------------------------------------------------------------------------
-! Tohoku University, Keiriki
-!------------------------------------------------------------------------------
-!
-! MODULE: h5fort_parallel_hdf5_xdmf
-!
-!> @author
-!> Yuta Suzuki
-!
-! DESCRIPTION:
-!>  Output HDF5 files and XDMF fragments for parallel visualization with ParaView.
-!
-! REVISION HISTORY:
-!------------------------------------------------------------------------------
-! module_phdf5.F90 - Parallel HDF5 ライタ (MPI-IO / Collective I/O)
-!
-! 既存の module_hdf5 / t_hdf5_writer と同じ呼び出し界面を保ちつつ、
-! 全ランクが 1 つの共有 HDF5 ファイルへ MPI-IO で書き込む。
-!
-! HDF5 ファイル構造 (タイムステップごとに 1 ファイル、全ランク共有):
-!   ファイル名パターン:
-!     ts{ts:04d}.h5  (/ugrid + /polydata 両グループを格納)
-!
-!   ts{ts:04d}.h5:
-!   /ugrid/
-!     geometry/
-!       nodes        [total_np][3]   float64   (全ランク連結)
-!       connectivity [total_nc][8]   int64     (グローバルノード番号, offset_points 加算済み)
-!     point_data/
-!       <name>       [total_np]      or [total_np][ncomp]
-!     cell_data/
-!       <name>       [total_nc]
-!   /polydata/
-!     geometry/
-!       nodes        [total_np][3]   float64
-!     point_data/
-!       <name>       [total_np]      or [total_np][ncomp]
-!
-! connectivity について:
-!   呼び出し側がグローバル 0-indexed 番号に変換してから渡す。
-!   (ローカル -> グローバルの変換は sample_build_comm_info 等の呼び出し側で行う)
-!   XDMF がグローバル dataset を直接参照するため、グローバルノード番号で格納する。
-!
-! 次元の注意 (module_hdf5 と同一):
-!   Fortran 配列 data(ncomp, np) (列優先) を HDF5 dims=[ncomp, np] で渡すと
-!   HDF5 ファイルには C 行優先の [np][ncomp] として格納される。
-!   XDMF の Dimensions 属性も C 順: "np ncomp"
-!
-! 使い方:
-!
-!   ug%h5_filepath   = 'result/phdf5/ts0000.h5'
-!   ug%output_type = 'UnstructuredGrid'
-!   ug%num_points  = np
-!   ug%num_cells   = nc
-!   ug%comm        = MPI_COMM_WORLD     ! integer MPI コミュニケータ
-!   ug%me          = me_proc
-!   ug%nprocs      = nprocs
-!   call ug%init()     ! MPI_Allgather + ファイル新規作成（全ランク集合的）
-!   call ug%write_geometry_ugrid(nodes, connectivity)
-!   call ug%write_point_data(pressure, 'Pressure')
-!   call ug%close()
-!
-!   ! PolyData は同じファイルに追記（init が既存ファイルを RDWR で再オープン）
-!   pd%h5_filepath   = 'result/phdf5/ts0000.h5'
-!   pd%output_type = 'PolyData'
-!   ...
-!   call pd%init()
-!   call pd%write_geometry_polydata(nodes)
-!   call pd%close()
-!
-!
-!------------------------------------------------------------------------------
-!
-! write_fragment でグローバル mesh を直接参照する。
-! HyperSlab / rank Grid は使わない。
-! ParaView XDMF3 Reader T で読み込み可能。
-!
-! 断片ファイル名:
-!   metadata/ts{ts:04d}_{output_type}_phdf5.xdmf.part
-!
-! 断片ファイル構造 (ugrid 例):
-!   <Topology TopologyType="Hexahedron" NumberOfElements="1000">
-!     <DataItem Format="HDF" NumberType="Int" Precision="8" Dimensions="1000 8">
-!       ../phdf5/ts0000.h5:/ugrid/geometry/connectivity
-!     </DataItem>
-!   </Topology>
-!   <Geometry GeometryType="XYZ">
-!     <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="1694 3">
-!       ../phdf5/ts0000.h5:/ugrid/geometry/nodes
-!     </DataItem>
-!   </Geometry>
-!   <Attribute Name="Pressure" AttributeType="Scalar" Center="Node">
-!     <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="1694">
-!       ../phdf5/ts0000.h5:/ugrid/point_data/Pressure
-!     </DataItem>
-!   </Attribute>
-!   ...
-!
-! output_xdmf がこの断片を <Grid GridType="Uniform"> でラップし、
-! Temporal Collection を構成する。
-!
-! 最終 XDMF 構造:
-!   Temporal Collection
-!    ├ Uniform Grid (ts0000) ← time + fragment content
-!    ├ Uniform Grid (ts0001)
-!    └ ...
-!
-!------------------------------------------------------------------------------
+
+
+! DO NOT EDIT — generated from src/fypp/h5xdmf/h5fort_h5xdmf_parallel.fypp
+! To regenerate: src/fypp/generate_fypp.sh
 
 module h5fort_parallel_hdf5_xdmf
   use hdf5
@@ -120,10 +16,6 @@ module h5fort_parallel_hdf5_xdmf
   private
 
   public :: t_phdf5_writer
-
-  ! HDF5 型 ID
-  integer(HID_T) :: h5t_i32_
-  integer(HID_T) :: h5t_i64_
 
   ! Checker flags
   logical, private :: is_file_initialized = .false.
@@ -193,31 +85,137 @@ module h5fort_parallel_hdf5_xdmf
     ! zero padding
     integer            :: seq_digits = 5
     integer            :: rank_digits = 4
+    integer, private   :: geometry_precision = 8
+    integer, private   :: topology_precision = 8
 
     ! 属性リスト
     integer, private :: n_attrs = 0
     type(t_phdf5_attr_info) :: attrs(MAX_ATTRS)
 
   contains
-    procedure :: init               => phdf5_init
-    procedure :: write_geometry_ugrid_i64 => phdf5_geom_ugrid_i64
-    procedure :: write_geometry_ugrid_i32 => phdf5_geom_ugrid_i32
-    generic   :: write_geometry_ugrid    => write_geometry_ugrid_i64, write_geometry_ugrid_i32
-    procedure :: write_geometry_polydata => phdf5_geom_polydata
-    generic   :: write_geometry => write_geometry_ugrid_i64, write_geometry_ugrid_i32, write_geometry_polydata
-    procedure :: write_point_1d     => phdf5_point_1d
-    procedure :: write_point_2d     => phdf5_point_2d
-    generic   :: write_point_data   => write_point_1d, write_point_2d
-    procedure :: write_cell_i32     => phdf5_cell_i32
-    generic   :: write_cell_data    => write_cell_i32
-    procedure :: close              => phdf5_close
+    procedure :: init  => phdf5_init
+    procedure :: close => phdf5_close
+
+    procedure :: write_geometry_ugrid_real32_int8 => phdf5_write_geom_ugrid_real32_int8
+    procedure :: write_geometry_ugrid_real32_int16 => phdf5_write_geom_ugrid_real32_int16
+    procedure :: write_geometry_ugrid_real32_int32 => phdf5_write_geom_ugrid_real32_int32
+    procedure :: write_geometry_ugrid_real32_int64 => phdf5_write_geom_ugrid_real32_int64
+    procedure :: write_geometry_polydata_real32 => phdf5_geom_polydata_real32
+    procedure :: write_geometry_ugrid_real64_int8 => phdf5_write_geom_ugrid_real64_int8
+    procedure :: write_geometry_ugrid_real64_int16 => phdf5_write_geom_ugrid_real64_int16
+    procedure :: write_geometry_ugrid_real64_int32 => phdf5_write_geom_ugrid_real64_int32
+    procedure :: write_geometry_ugrid_real64_int64 => phdf5_write_geom_ugrid_real64_int64
+    procedure :: write_geometry_polydata_real64 => phdf5_geom_polydata_real64
+    procedure :: write_geometry_ugrid_real128_int8 => phdf5_write_geom_ugrid_real128_int8
+    procedure :: write_geometry_ugrid_real128_int16 => phdf5_write_geom_ugrid_real128_int16
+    procedure :: write_geometry_ugrid_real128_int32 => phdf5_write_geom_ugrid_real128_int32
+    procedure :: write_geometry_ugrid_real128_int64 => phdf5_write_geom_ugrid_real128_int64
+    procedure :: write_geometry_polydata_real128 => phdf5_geom_polydata_real128
+    ! Compatibility names from the former hand-written implementation.
+    procedure :: write_geometry_ugrid_i64 => phdf5_write_geom_ugrid_real64_int64
+    procedure :: write_geometry_ugrid_i32 => phdf5_write_geom_ugrid_real64_int32
+    procedure :: write_geometry_polydata  => phdf5_geom_polydata_real64
+    generic   :: write_geometry_ugrid => &
+      write_geometry_ugrid_real32_int8, &
+      write_geometry_ugrid_real32_int16, &
+      write_geometry_ugrid_real32_int32, &
+      write_geometry_ugrid_real32_int64, &
+      write_geometry_ugrid_real64_int8, &
+      write_geometry_ugrid_real64_int16, &
+      write_geometry_ugrid_real64_int32, &
+      write_geometry_ugrid_real64_int64, &
+      write_geometry_ugrid_real128_int8, &
+      write_geometry_ugrid_real128_int16, &
+      write_geometry_ugrid_real128_int32, &
+      write_geometry_ugrid_real128_int64
+    generic   :: write_geometry => &
+      write_geometry_ugrid_real32_int8, &
+      write_geometry_ugrid_real32_int16, &
+      write_geometry_ugrid_real32_int32, &
+      write_geometry_ugrid_real32_int64, &
+      write_geometry_ugrid_real64_int8, &
+      write_geometry_ugrid_real64_int16, &
+      write_geometry_ugrid_real64_int32, &
+      write_geometry_ugrid_real64_int64, &
+      write_geometry_ugrid_real128_int8, &
+      write_geometry_ugrid_real128_int16, &
+      write_geometry_ugrid_real128_int32, &
+      write_geometry_ugrid_real128_int64, &
+      write_geometry_polydata_real32, &
+      write_geometry_polydata_real64, &
+      write_geometry_polydata_real128
+
+    procedure :: write_point_1d_int8 => phdf5_point_1d_int8
+    procedure :: write_cell_1d_int8  => phdf5_cell_1d_int8
+    procedure :: write_point_2d_int8 => phdf5_point_2d_int8
+    procedure :: write_cell_2d_int8  => phdf5_cell_2d_int8
+    procedure :: write_point_1d_int16 => phdf5_point_1d_int16
+    procedure :: write_cell_1d_int16  => phdf5_cell_1d_int16
+    procedure :: write_point_2d_int16 => phdf5_point_2d_int16
+    procedure :: write_cell_2d_int16  => phdf5_cell_2d_int16
+    procedure :: write_point_1d_int32 => phdf5_point_1d_int32
+    procedure :: write_cell_1d_int32  => phdf5_cell_1d_int32
+    procedure :: write_point_2d_int32 => phdf5_point_2d_int32
+    procedure :: write_cell_2d_int32  => phdf5_cell_2d_int32
+    procedure :: write_point_1d_int64 => phdf5_point_1d_int64
+    procedure :: write_cell_1d_int64  => phdf5_cell_1d_int64
+    procedure :: write_point_2d_int64 => phdf5_point_2d_int64
+    procedure :: write_cell_2d_int64  => phdf5_cell_2d_int64
+    procedure :: write_point_1d_real32 => phdf5_point_1d_real32
+    procedure :: write_cell_1d_real32  => phdf5_cell_1d_real32
+    procedure :: write_point_2d_real32 => phdf5_point_2d_real32
+    procedure :: write_cell_2d_real32  => phdf5_cell_2d_real32
+    procedure :: write_point_1d_real64 => phdf5_point_1d_real64
+    procedure :: write_cell_1d_real64  => phdf5_cell_1d_real64
+    procedure :: write_point_2d_real64 => phdf5_point_2d_real64
+    procedure :: write_cell_2d_real64  => phdf5_cell_2d_real64
+    procedure :: write_point_1d_real128 => phdf5_point_1d_real128
+    procedure :: write_cell_1d_real128  => phdf5_cell_1d_real128
+    procedure :: write_point_2d_real128 => phdf5_point_2d_real128
+    procedure :: write_cell_2d_real128  => phdf5_cell_2d_real128
+
+    ! Compatibility names for callers that used the specific bindings.
+    procedure :: write_point_1d => phdf5_point_1d_real64
+    procedure :: write_point_2d => phdf5_point_2d_real64
+    procedure :: write_cell_i32 => phdf5_cell_1d_int32
+    generic   :: write_point_data => &
+      write_point_1d_int8, &
+      write_point_2d_int8, &
+      write_point_1d_int16, &
+      write_point_2d_int16, &
+      write_point_1d_int32, &
+      write_point_2d_int32, &
+      write_point_1d_int64, &
+      write_point_2d_int64, &
+      write_point_1d_real32, &
+      write_point_2d_real32, &
+      write_point_1d_real64, &
+      write_point_2d_real64, &
+      write_point_1d_real128, &
+      write_point_2d_real128
+    generic   :: write_cell_data => &
+      write_cell_1d_int8, &
+      write_cell_2d_int8, &
+      write_cell_1d_int16, &
+      write_cell_2d_int16, &
+      write_cell_1d_int32, &
+      write_cell_2d_int32, &
+      write_cell_1d_int64, &
+      write_cell_2d_int64, &
+      write_cell_1d_real32, &
+      write_cell_2d_real32, &
+      write_cell_1d_real64, &
+      write_cell_2d_real64, &
+      write_cell_1d_real128, &
+      write_cell_2d_real128
+
     ! xdmf fragment
     procedure :: add_point_attr_1d   => phdf5_xdmf_add_point_1d
     procedure :: add_point_attr_2d   => phdf5_xdmf_add_point_2d
     generic   :: add_point_attr      => add_point_attr_1d, add_point_attr_2d
     procedure :: add_cell_attr_i32   => phdf5_xdmf_add_cell_i32
     generic   :: add_cell_attr       => add_cell_attr_i32
-    procedure :: write_fragment          => phdf5_xdmf_write_fragment
+    procedure :: write_fragment => phdf5_xdmf_write_fragment
   end type t_phdf5_writer
 
 contains
@@ -239,8 +237,6 @@ contains
     integer(HID_T) :: fapl_id, gid_base
     logical :: file_exists
     integer :: iexist   ! 0 or 1 for MPI_Bcast
-    integer :: ierr
-    integer(HID_T) :: obj_count
 
     ! Check flags and required fields
 #   define ABORT(msg,X) \
@@ -252,6 +248,12 @@ contains
     end if
 #   undef ABORT
     is_file_initialized = .true.
+
+    call h5open_f(hdferr)
+    if (hdferr /= 0) then
+      write(error_unit,'(a)') 'ERROR phdf5_init: h5open_f failed'
+      call MPI_Abort(self%comm, 1, mpi_err)
+    end if
 
     ! Set MPI rank and size
     call MPI_Comm_rank(self%comm, self%me, mpi_err)
@@ -359,97 +361,6 @@ contains
   end subroutine phdf5_init
 
   !====================================================================
-  ! write_geometry_ugrid: nodes + connectivity -> /geometry
-  ! connectivity はグローバル 0-indexed で渡す（呼び出し側が変換済み）。
-  !====================================================================
-  subroutine phdf5_geom_ugrid_i64(self, nodes, connectivity)
-    class(t_phdf5_writer), intent(inout) :: self
-    real(real64),   intent(in) :: nodes(3, self%num_points)
-    integer(int64), intent(in) :: connectivity(8, self%num_cells)
-
-    ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
-    call write_r64_2d_slab_(self%gid_geom, 'nodes', 3_int64, &
-                            self%num_points, self%offset_points, self%total_points, &
-                            nodes, self%xfer_id)
-
-    ! connectivity: グローバル 0-indexed をそのまま書き込む
-    call write_i64_2d_slab_(self%gid_geom, 'connectivity', 8_int64, &
-                            self%num_cells, self%offset_cells, self%total_cells, &
-                            connectivity, self%xfer_id)
-  end subroutine phdf5_geom_ugrid_i64
-  subroutine phdf5_geom_ugrid_i32(self, nodes, connectivity)
-    class(t_phdf5_writer), intent(inout) :: self
-    real(real64),   intent(in) :: nodes(3, self%num_points)
-    integer(int32), intent(in) :: connectivity(8, self%num_cells)
-
-    ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
-    call write_r64_2d_slab_(self%gid_geom, 'nodes', 3_int64, &
-                            self%num_points, self%offset_points, self%total_points, &
-                            nodes, self%xfer_id)
-
-    ! connectivity: グローバル 0-indexed をそのまま書き込む
-    call write_i32_2d_slab_(self%gid_geom, 'connectivity', 8_int32, &
-                            self%num_cells, self%offset_cells, self%total_cells, &
-                            connectivity, self%xfer_id)
-  end subroutine phdf5_geom_ugrid_i32
-
-  !====================================================================
-  ! write_geometry_polydata: nodes のみ -> /geometry
-  !====================================================================
-  subroutine phdf5_geom_polydata(self, nodes)
-    class(t_phdf5_writer), intent(inout) :: self
-    real(real64), intent(in) :: nodes(3, self%num_points)
-
-    call write_r64_2d_slab_(self%gid_geom, 'nodes', 3_int64, &
-                            self%num_points, self%offset_points, self%total_points, &
-                            nodes, self%xfer_id)
-  end subroutine phdf5_geom_polydata
-
-  !====================================================================
-  ! write_point_data (1D スカラー)
-  !====================================================================
-  subroutine phdf5_point_1d(self, data, field_name)
-    class(t_phdf5_writer), intent(inout) :: self
-    real(real64),     intent(in) :: data(:)
-    character(len=*), intent(in) :: field_name
-
-    call write_r64_1d_slab_(self%gid_pdata, trim(field_name), &
-                            self%num_points, self%offset_points, self%total_points, &
-                            data, self%xfer_id)
-  end subroutine phdf5_point_1d
-
-  !====================================================================
-  ! write_point_data (2D: ベクトル / 対称テンソル)
-  !====================================================================
-  subroutine phdf5_point_2d(self, data, field_name)
-    class(t_phdf5_writer), intent(inout) :: self
-    real(real64),     intent(in) :: data(:,:)
-    character(len=*), intent(in) :: field_name
-
-    call write_r64_2d_slab_(self%gid_pdata, trim(field_name), &
-                            int(size(data, 1), int64), int(size(data, 2), int64), &
-                            self%offset_points, self%total_points, &
-                            data, self%xfer_id)
-  end subroutine phdf5_point_2d
-
-  !====================================================================
-  ! write_cell_data (int32 スカラー)
-  !====================================================================
-  subroutine phdf5_cell_i32(self, data, field_name)
-    class(t_phdf5_writer), intent(inout) :: self
-    integer(int32),   intent(in) :: data(:)
-    character(len=*), intent(in) :: field_name
-
-    if (self%gid_cdata < 0) then
-      write(error_unit,'(a)') 'ERROR phdf5_cell_i32: cell_data group not open'
-      stop 1
-    end if
-    call write_i32_1d_slab_(self%gid_cdata, trim(field_name), &
-                            self%num_cells, self%offset_cells, self%total_cells, &
-                            data, self%xfer_id)
-  end subroutine phdf5_cell_i32
-
-  !====================================================================
   ! close: グループ・Property List・ファイルを閉じる
   !====================================================================
   subroutine phdf5_close(self)
@@ -460,7 +371,6 @@ contains
     call h5gclose_f(self%gid_pdata, hdferr)
     if (self%gid_cdata >= 0) call h5gclose_f(self%gid_cdata, hdferr)
     call h5pclose_f(self%xfer_id, hdferr)
-    ! 全データをディスクにフラッシュしてからファイルを閉じる
     call h5fflush_f(self%file_id, H5F_SCOPE_GLOBAL_F, hdferr)
     call h5fclose_f(self%file_id, hdferr)
 
@@ -476,6 +386,1228 @@ contains
   end subroutine phdf5_close
 
   !====================================================================
+  ! write_geometry_ugrid: nodes + connectivity -> /geometry
+  !   connectivity はグローバル 0-indexed で渡す（呼び出し側が変換済み）。
+  ! write_geometry_polydata: nodes のみ -> /geometry
+  !====================================================================
+  subroutine phdf5_write_geom_ugrid_real32_int8(self, nodes, connectivity)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real32),   intent(in) :: nodes(:, :)
+    integer(int8), intent(in) :: connectivity(:, :)
+
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [3_int64, self%num_points])
+    if (rank(nodes) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [8_int64, self%num_cells])
+    if (rank(connectivity) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+    ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
+    call write_slab_real32_2d_(self%gid_geom, 'nodes', &
+      [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
+
+    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    call write_slab_int8_2d_(self%gid_geom, 'connectivity', &
+      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
+    self%geometry_precision = 4
+    self%topology_precision = 1
+  end subroutine phdf5_write_geom_ugrid_real32_int8
+
+  subroutine phdf5_write_geom_ugrid_real32_int16(self, nodes, connectivity)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real32),   intent(in) :: nodes(:, :)
+    integer(int16), intent(in) :: connectivity(:, :)
+
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [3_int64, self%num_points])
+    if (rank(nodes) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [8_int64, self%num_cells])
+    if (rank(connectivity) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+    ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
+    call write_slab_real32_2d_(self%gid_geom, 'nodes', &
+      [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
+
+    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    call write_slab_int16_2d_(self%gid_geom, 'connectivity', &
+      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
+    self%geometry_precision = 4
+    self%topology_precision = 2
+  end subroutine phdf5_write_geom_ugrid_real32_int16
+
+  subroutine phdf5_write_geom_ugrid_real32_int32(self, nodes, connectivity)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real32),   intent(in) :: nodes(:, :)
+    integer(int32), intent(in) :: connectivity(:, :)
+
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [3_int64, self%num_points])
+    if (rank(nodes) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [8_int64, self%num_cells])
+    if (rank(connectivity) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+    ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
+    call write_slab_real32_2d_(self%gid_geom, 'nodes', &
+      [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
+
+    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    call write_slab_int32_2d_(self%gid_geom, 'connectivity', &
+      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
+    self%geometry_precision = 4
+    self%topology_precision = 4
+  end subroutine phdf5_write_geom_ugrid_real32_int32
+
+  subroutine phdf5_write_geom_ugrid_real32_int64(self, nodes, connectivity)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real32),   intent(in) :: nodes(:, :)
+    integer(int64), intent(in) :: connectivity(:, :)
+
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [3_int64, self%num_points])
+    if (rank(nodes) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [8_int64, self%num_cells])
+    if (rank(connectivity) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+    ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
+    call write_slab_real32_2d_(self%gid_geom, 'nodes', &
+      [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
+
+    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    call write_slab_int64_2d_(self%gid_geom, 'connectivity', &
+      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
+    self%geometry_precision = 4
+    self%topology_precision = 8
+  end subroutine phdf5_write_geom_ugrid_real32_int64
+
+  subroutine phdf5_geom_polydata_real32(self, nodes)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real32), intent(in) :: nodes(:, :)
+
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [3_int64, self%num_points])
+    if (rank(nodes) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+    call write_slab_real32_2d_(self%gid_geom, 'nodes', &
+      [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
+    self%geometry_precision = 4
+  end subroutine phdf5_geom_polydata_real32
+
+  subroutine phdf5_write_geom_ugrid_real64_int8(self, nodes, connectivity)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real64),   intent(in) :: nodes(:, :)
+    integer(int8), intent(in) :: connectivity(:, :)
+
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [3_int64, self%num_points])
+    if (rank(nodes) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [8_int64, self%num_cells])
+    if (rank(connectivity) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+    ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
+    call write_slab_real64_2d_(self%gid_geom, 'nodes', &
+      [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
+
+    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    call write_slab_int8_2d_(self%gid_geom, 'connectivity', &
+      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
+    self%geometry_precision = 8
+    self%topology_precision = 1
+  end subroutine phdf5_write_geom_ugrid_real64_int8
+
+  subroutine phdf5_write_geom_ugrid_real64_int16(self, nodes, connectivity)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real64),   intent(in) :: nodes(:, :)
+    integer(int16), intent(in) :: connectivity(:, :)
+
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [3_int64, self%num_points])
+    if (rank(nodes) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [8_int64, self%num_cells])
+    if (rank(connectivity) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+    ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
+    call write_slab_real64_2d_(self%gid_geom, 'nodes', &
+      [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
+
+    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    call write_slab_int16_2d_(self%gid_geom, 'connectivity', &
+      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
+    self%geometry_precision = 8
+    self%topology_precision = 2
+  end subroutine phdf5_write_geom_ugrid_real64_int16
+
+  subroutine phdf5_write_geom_ugrid_real64_int32(self, nodes, connectivity)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real64),   intent(in) :: nodes(:, :)
+    integer(int32), intent(in) :: connectivity(:, :)
+
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [3_int64, self%num_points])
+    if (rank(nodes) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [8_int64, self%num_cells])
+    if (rank(connectivity) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+    ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
+    call write_slab_real64_2d_(self%gid_geom, 'nodes', &
+      [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
+
+    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    call write_slab_int32_2d_(self%gid_geom, 'connectivity', &
+      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
+    self%geometry_precision = 8
+    self%topology_precision = 4
+  end subroutine phdf5_write_geom_ugrid_real64_int32
+
+  subroutine phdf5_write_geom_ugrid_real64_int64(self, nodes, connectivity)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real64),   intent(in) :: nodes(:, :)
+    integer(int64), intent(in) :: connectivity(:, :)
+
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [3_int64, self%num_points])
+    if (rank(nodes) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [8_int64, self%num_cells])
+    if (rank(connectivity) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+    ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
+    call write_slab_real64_2d_(self%gid_geom, 'nodes', &
+      [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
+
+    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    call write_slab_int64_2d_(self%gid_geom, 'connectivity', &
+      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
+    self%geometry_precision = 8
+    self%topology_precision = 8
+  end subroutine phdf5_write_geom_ugrid_real64_int64
+
+  subroutine phdf5_geom_polydata_real64(self, nodes)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real64), intent(in) :: nodes(:, :)
+
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [3_int64, self%num_points])
+    if (rank(nodes) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+    call write_slab_real64_2d_(self%gid_geom, 'nodes', &
+      [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
+    self%geometry_precision = 8
+  end subroutine phdf5_geom_polydata_real64
+
+  subroutine phdf5_write_geom_ugrid_real128_int8(self, nodes, connectivity)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real128),   intent(in) :: nodes(:, :)
+    integer(int8), intent(in) :: connectivity(:, :)
+
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [3_int64, self%num_points])
+    if (rank(nodes) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [8_int64, self%num_cells])
+    if (rank(connectivity) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+    ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
+    call write_slab_real128_2d_(self%gid_geom, 'nodes', &
+      [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
+
+    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    call write_slab_int8_2d_(self%gid_geom, 'connectivity', &
+      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
+    self%geometry_precision = 16
+    self%topology_precision = 1
+  end subroutine phdf5_write_geom_ugrid_real128_int8
+
+  subroutine phdf5_write_geom_ugrid_real128_int16(self, nodes, connectivity)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real128),   intent(in) :: nodes(:, :)
+    integer(int16), intent(in) :: connectivity(:, :)
+
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [3_int64, self%num_points])
+    if (rank(nodes) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [8_int64, self%num_cells])
+    if (rank(connectivity) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+    ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
+    call write_slab_real128_2d_(self%gid_geom, 'nodes', &
+      [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
+
+    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    call write_slab_int16_2d_(self%gid_geom, 'connectivity', &
+      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
+    self%geometry_precision = 16
+    self%topology_precision = 2
+  end subroutine phdf5_write_geom_ugrid_real128_int16
+
+  subroutine phdf5_write_geom_ugrid_real128_int32(self, nodes, connectivity)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real128),   intent(in) :: nodes(:, :)
+    integer(int32), intent(in) :: connectivity(:, :)
+
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [3_int64, self%num_points])
+    if (rank(nodes) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [8_int64, self%num_cells])
+    if (rank(connectivity) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+    ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
+    call write_slab_real128_2d_(self%gid_geom, 'nodes', &
+      [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
+
+    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    call write_slab_int32_2d_(self%gid_geom, 'connectivity', &
+      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
+    self%geometry_precision = 16
+    self%topology_precision = 4
+  end subroutine phdf5_write_geom_ugrid_real128_int32
+
+  subroutine phdf5_write_geom_ugrid_real128_int64(self, nodes, connectivity)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real128),   intent(in) :: nodes(:, :)
+    integer(int64), intent(in) :: connectivity(:, :)
+
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [3_int64, self%num_points])
+    if (rank(nodes) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [8_int64, self%num_cells])
+    if (rank(connectivity) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+    ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
+    call write_slab_real128_2d_(self%gid_geom, 'nodes', &
+      [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
+
+    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    call write_slab_int64_2d_(self%gid_geom, 'connectivity', &
+      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
+    self%geometry_precision = 16
+    self%topology_precision = 8
+  end subroutine phdf5_write_geom_ugrid_real128_int64
+
+  subroutine phdf5_geom_polydata_real128(self, nodes)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real128), intent(in) :: nodes(:, :)
+
+block
+  integer :: check_shape_d__
+
+  associate(check_shape_expected__ => [3_int64, self%num_points])
+    if (rank(nodes) /= size(check_shape_expected__)) then
+      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+    end if
+
+    do check_shape_d__ = 1, size(check_shape_expected__)
+      if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
+        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      end if
+    end do
+  end associate
+end block
+    call write_slab_real128_2d_(self%gid_geom, 'nodes', &
+      [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
+    self%geometry_precision = 16
+  end subroutine phdf5_geom_polydata_real128
+
+
+  !====================================================================
+  ! write_point_data/write_cell_data
+  !====================================================================
+  subroutine phdf5_point_1d_int8(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    integer(int8), intent(in) :: data(:)
+    character(len=*), intent(in) :: field_name
+
+    if (int(size(data, 1), int64) /= self%num_points) then
+      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+    end if
+    call write_slab_int8_1d_(&
+      self%gid_pdata, trim(field_name), &
+      [int(size(data, 1), int64)], &
+      self%offset_points, self%total_points, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Node', 'Int', 1, &
+      self%total_points, 1)
+  end subroutine phdf5_point_1d_int8
+
+  subroutine phdf5_cell_1d_int8(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    integer(int8), intent(in) :: data(:)
+    character(len=*),  intent(in) :: field_name
+
+    if (self%gid_cdata < 0) then
+      write(error_unit,'(a)') 'ERROR phdf5_cell_1d_int8: cell_data group not open'
+      stop 1
+    end if
+    if (int(size(data, 1), int64) /= self%num_cells) then
+      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+    end if
+
+    call write_slab_int8_1d_(&
+      self%gid_cdata, trim(field_name), &
+      [int(size(data, 1), int64)], &
+      self%offset_cells, self%total_cells, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Cell', 'Int', 1, &
+      self%total_cells, 1)
+
+  end subroutine phdf5_cell_1d_int8
+
+  subroutine phdf5_point_2d_int8(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    integer(int8), intent(in) :: data(:, :)
+    character(len=*), intent(in) :: field_name
+
+    if (int(size(data, 2), int64) /= self%num_points) then
+      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+    end if
+    call write_slab_int8_2d_(&
+      self%gid_pdata, trim(field_name), &
+      [int(size(data, 1), int64), int(size(data, 2), int64)], &
+      self%offset_points, self%total_points, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Node', 'Int', 1, &
+      self%total_points, size(data, 1))
+  end subroutine phdf5_point_2d_int8
+
+  subroutine phdf5_cell_2d_int8(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    integer(int8), intent(in) :: data(:, :)
+    character(len=*),  intent(in) :: field_name
+
+    if (self%gid_cdata < 0) then
+      write(error_unit,'(a)') 'ERROR phdf5_cell_2d_int8: cell_data group not open'
+      stop 1
+    end if
+    if (int(size(data, 2), int64) /= self%num_cells) then
+      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+    end if
+
+    call write_slab_int8_2d_(&
+      self%gid_cdata, trim(field_name), &
+      [int(size(data, 1), int64), int(size(data, 2), int64)], &
+      self%offset_cells, self%total_cells, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Cell', 'Int', 1, &
+      self%total_cells, size(data, 1))
+
+  end subroutine phdf5_cell_2d_int8
+
+  subroutine phdf5_point_1d_int16(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    integer(int16), intent(in) :: data(:)
+    character(len=*), intent(in) :: field_name
+
+    if (int(size(data, 1), int64) /= self%num_points) then
+      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+    end if
+    call write_slab_int16_1d_(&
+      self%gid_pdata, trim(field_name), &
+      [int(size(data, 1), int64)], &
+      self%offset_points, self%total_points, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Node', 'Int', 2, &
+      self%total_points, 1)
+  end subroutine phdf5_point_1d_int16
+
+  subroutine phdf5_cell_1d_int16(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    integer(int16), intent(in) :: data(:)
+    character(len=*),  intent(in) :: field_name
+
+    if (self%gid_cdata < 0) then
+      write(error_unit,'(a)') 'ERROR phdf5_cell_1d_int16: cell_data group not open'
+      stop 1
+    end if
+    if (int(size(data, 1), int64) /= self%num_cells) then
+      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+    end if
+
+    call write_slab_int16_1d_(&
+      self%gid_cdata, trim(field_name), &
+      [int(size(data, 1), int64)], &
+      self%offset_cells, self%total_cells, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Cell', 'Int', 2, &
+      self%total_cells, 1)
+
+  end subroutine phdf5_cell_1d_int16
+
+  subroutine phdf5_point_2d_int16(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    integer(int16), intent(in) :: data(:, :)
+    character(len=*), intent(in) :: field_name
+
+    if (int(size(data, 2), int64) /= self%num_points) then
+      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+    end if
+    call write_slab_int16_2d_(&
+      self%gid_pdata, trim(field_name), &
+      [int(size(data, 1), int64), int(size(data, 2), int64)], &
+      self%offset_points, self%total_points, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Node', 'Int', 2, &
+      self%total_points, size(data, 1))
+  end subroutine phdf5_point_2d_int16
+
+  subroutine phdf5_cell_2d_int16(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    integer(int16), intent(in) :: data(:, :)
+    character(len=*),  intent(in) :: field_name
+
+    if (self%gid_cdata < 0) then
+      write(error_unit,'(a)') 'ERROR phdf5_cell_2d_int16: cell_data group not open'
+      stop 1
+    end if
+    if (int(size(data, 2), int64) /= self%num_cells) then
+      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+    end if
+
+    call write_slab_int16_2d_(&
+      self%gid_cdata, trim(field_name), &
+      [int(size(data, 1), int64), int(size(data, 2), int64)], &
+      self%offset_cells, self%total_cells, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Cell', 'Int', 2, &
+      self%total_cells, size(data, 1))
+
+  end subroutine phdf5_cell_2d_int16
+
+  subroutine phdf5_point_1d_int32(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    integer(int32), intent(in) :: data(:)
+    character(len=*), intent(in) :: field_name
+
+    if (int(size(data, 1), int64) /= self%num_points) then
+      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+    end if
+    call write_slab_int32_1d_(&
+      self%gid_pdata, trim(field_name), &
+      [int(size(data, 1), int64)], &
+      self%offset_points, self%total_points, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Node', 'Int', 4, &
+      self%total_points, 1)
+  end subroutine phdf5_point_1d_int32
+
+  subroutine phdf5_cell_1d_int32(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    integer(int32), intent(in) :: data(:)
+    character(len=*),  intent(in) :: field_name
+
+    if (self%gid_cdata < 0) then
+      write(error_unit,'(a)') 'ERROR phdf5_cell_1d_int32: cell_data group not open'
+      stop 1
+    end if
+    if (int(size(data, 1), int64) /= self%num_cells) then
+      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+    end if
+
+    call write_slab_int32_1d_(&
+      self%gid_cdata, trim(field_name), &
+      [int(size(data, 1), int64)], &
+      self%offset_cells, self%total_cells, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Cell', 'Int', 4, &
+      self%total_cells, 1)
+
+  end subroutine phdf5_cell_1d_int32
+
+  subroutine phdf5_point_2d_int32(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    integer(int32), intent(in) :: data(:, :)
+    character(len=*), intent(in) :: field_name
+
+    if (int(size(data, 2), int64) /= self%num_points) then
+      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+    end if
+    call write_slab_int32_2d_(&
+      self%gid_pdata, trim(field_name), &
+      [int(size(data, 1), int64), int(size(data, 2), int64)], &
+      self%offset_points, self%total_points, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Node', 'Int', 4, &
+      self%total_points, size(data, 1))
+  end subroutine phdf5_point_2d_int32
+
+  subroutine phdf5_cell_2d_int32(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    integer(int32), intent(in) :: data(:, :)
+    character(len=*),  intent(in) :: field_name
+
+    if (self%gid_cdata < 0) then
+      write(error_unit,'(a)') 'ERROR phdf5_cell_2d_int32: cell_data group not open'
+      stop 1
+    end if
+    if (int(size(data, 2), int64) /= self%num_cells) then
+      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+    end if
+
+    call write_slab_int32_2d_(&
+      self%gid_cdata, trim(field_name), &
+      [int(size(data, 1), int64), int(size(data, 2), int64)], &
+      self%offset_cells, self%total_cells, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Cell', 'Int', 4, &
+      self%total_cells, size(data, 1))
+
+  end subroutine phdf5_cell_2d_int32
+
+  subroutine phdf5_point_1d_int64(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    integer(int64), intent(in) :: data(:)
+    character(len=*), intent(in) :: field_name
+
+    if (int(size(data, 1), int64) /= self%num_points) then
+      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+    end if
+    call write_slab_int64_1d_(&
+      self%gid_pdata, trim(field_name), &
+      [int(size(data, 1), int64)], &
+      self%offset_points, self%total_points, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Node', 'Int', 8, &
+      self%total_points, 1)
+  end subroutine phdf5_point_1d_int64
+
+  subroutine phdf5_cell_1d_int64(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    integer(int64), intent(in) :: data(:)
+    character(len=*),  intent(in) :: field_name
+
+    if (self%gid_cdata < 0) then
+      write(error_unit,'(a)') 'ERROR phdf5_cell_1d_int64: cell_data group not open'
+      stop 1
+    end if
+    if (int(size(data, 1), int64) /= self%num_cells) then
+      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+    end if
+
+    call write_slab_int64_1d_(&
+      self%gid_cdata, trim(field_name), &
+      [int(size(data, 1), int64)], &
+      self%offset_cells, self%total_cells, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Cell', 'Int', 8, &
+      self%total_cells, 1)
+
+  end subroutine phdf5_cell_1d_int64
+
+  subroutine phdf5_point_2d_int64(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    integer(int64), intent(in) :: data(:, :)
+    character(len=*), intent(in) :: field_name
+
+    if (int(size(data, 2), int64) /= self%num_points) then
+      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+    end if
+    call write_slab_int64_2d_(&
+      self%gid_pdata, trim(field_name), &
+      [int(size(data, 1), int64), int(size(data, 2), int64)], &
+      self%offset_points, self%total_points, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Node', 'Int', 8, &
+      self%total_points, size(data, 1))
+  end subroutine phdf5_point_2d_int64
+
+  subroutine phdf5_cell_2d_int64(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    integer(int64), intent(in) :: data(:, :)
+    character(len=*),  intent(in) :: field_name
+
+    if (self%gid_cdata < 0) then
+      write(error_unit,'(a)') 'ERROR phdf5_cell_2d_int64: cell_data group not open'
+      stop 1
+    end if
+    if (int(size(data, 2), int64) /= self%num_cells) then
+      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+    end if
+
+    call write_slab_int64_2d_(&
+      self%gid_cdata, trim(field_name), &
+      [int(size(data, 1), int64), int(size(data, 2), int64)], &
+      self%offset_cells, self%total_cells, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Cell', 'Int', 8, &
+      self%total_cells, size(data, 1))
+
+  end subroutine phdf5_cell_2d_int64
+
+  subroutine phdf5_point_1d_real32(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real32), intent(in) :: data(:)
+    character(len=*), intent(in) :: field_name
+
+    if (int(size(data, 1), int64) /= self%num_points) then
+      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+    end if
+    call write_slab_real32_1d_(&
+      self%gid_pdata, trim(field_name), &
+      [int(size(data, 1), int64)], &
+      self%offset_points, self%total_points, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Node', 'Float', 4, &
+      self%total_points, 1)
+  end subroutine phdf5_point_1d_real32
+
+  subroutine phdf5_cell_1d_real32(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real32), intent(in) :: data(:)
+    character(len=*),  intent(in) :: field_name
+
+    if (self%gid_cdata < 0) then
+      write(error_unit,'(a)') 'ERROR phdf5_cell_1d_real32: cell_data group not open'
+      stop 1
+    end if
+    if (int(size(data, 1), int64) /= self%num_cells) then
+      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+    end if
+
+    call write_slab_real32_1d_(&
+      self%gid_cdata, trim(field_name), &
+      [int(size(data, 1), int64)], &
+      self%offset_cells, self%total_cells, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Cell', 'Float', 4, &
+      self%total_cells, 1)
+
+  end subroutine phdf5_cell_1d_real32
+
+  subroutine phdf5_point_2d_real32(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real32), intent(in) :: data(:, :)
+    character(len=*), intent(in) :: field_name
+
+    if (int(size(data, 2), int64) /= self%num_points) then
+      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+    end if
+    call write_slab_real32_2d_(&
+      self%gid_pdata, trim(field_name), &
+      [int(size(data, 1), int64), int(size(data, 2), int64)], &
+      self%offset_points, self%total_points, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Node', 'Float', 4, &
+      self%total_points, size(data, 1))
+  end subroutine phdf5_point_2d_real32
+
+  subroutine phdf5_cell_2d_real32(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real32), intent(in) :: data(:, :)
+    character(len=*),  intent(in) :: field_name
+
+    if (self%gid_cdata < 0) then
+      write(error_unit,'(a)') 'ERROR phdf5_cell_2d_real32: cell_data group not open'
+      stop 1
+    end if
+    if (int(size(data, 2), int64) /= self%num_cells) then
+      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+    end if
+
+    call write_slab_real32_2d_(&
+      self%gid_cdata, trim(field_name), &
+      [int(size(data, 1), int64), int(size(data, 2), int64)], &
+      self%offset_cells, self%total_cells, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Cell', 'Float', 4, &
+      self%total_cells, size(data, 1))
+
+  end subroutine phdf5_cell_2d_real32
+
+  subroutine phdf5_point_1d_real64(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real64), intent(in) :: data(:)
+    character(len=*), intent(in) :: field_name
+
+    if (int(size(data, 1), int64) /= self%num_points) then
+      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+    end if
+    call write_slab_real64_1d_(&
+      self%gid_pdata, trim(field_name), &
+      [int(size(data, 1), int64)], &
+      self%offset_points, self%total_points, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Node', 'Float', 8, &
+      self%total_points, 1)
+  end subroutine phdf5_point_1d_real64
+
+  subroutine phdf5_cell_1d_real64(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real64), intent(in) :: data(:)
+    character(len=*),  intent(in) :: field_name
+
+    if (self%gid_cdata < 0) then
+      write(error_unit,'(a)') 'ERROR phdf5_cell_1d_real64: cell_data group not open'
+      stop 1
+    end if
+    if (int(size(data, 1), int64) /= self%num_cells) then
+      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+    end if
+
+    call write_slab_real64_1d_(&
+      self%gid_cdata, trim(field_name), &
+      [int(size(data, 1), int64)], &
+      self%offset_cells, self%total_cells, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Cell', 'Float', 8, &
+      self%total_cells, 1)
+
+  end subroutine phdf5_cell_1d_real64
+
+  subroutine phdf5_point_2d_real64(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real64), intent(in) :: data(:, :)
+    character(len=*), intent(in) :: field_name
+
+    if (int(size(data, 2), int64) /= self%num_points) then
+      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+    end if
+    call write_slab_real64_2d_(&
+      self%gid_pdata, trim(field_name), &
+      [int(size(data, 1), int64), int(size(data, 2), int64)], &
+      self%offset_points, self%total_points, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Node', 'Float', 8, &
+      self%total_points, size(data, 1))
+  end subroutine phdf5_point_2d_real64
+
+  subroutine phdf5_cell_2d_real64(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real64), intent(in) :: data(:, :)
+    character(len=*),  intent(in) :: field_name
+
+    if (self%gid_cdata < 0) then
+      write(error_unit,'(a)') 'ERROR phdf5_cell_2d_real64: cell_data group not open'
+      stop 1
+    end if
+    if (int(size(data, 2), int64) /= self%num_cells) then
+      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+    end if
+
+    call write_slab_real64_2d_(&
+      self%gid_cdata, trim(field_name), &
+      [int(size(data, 1), int64), int(size(data, 2), int64)], &
+      self%offset_cells, self%total_cells, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Cell', 'Float', 8, &
+      self%total_cells, size(data, 1))
+
+  end subroutine phdf5_cell_2d_real64
+
+  subroutine phdf5_point_1d_real128(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real128), intent(in) :: data(:)
+    character(len=*), intent(in) :: field_name
+
+    if (int(size(data, 1), int64) /= self%num_points) then
+      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+    end if
+    call write_slab_real128_1d_(&
+      self%gid_pdata, trim(field_name), &
+      [int(size(data, 1), int64)], &
+      self%offset_points, self%total_points, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Node', 'Float', 16, &
+      self%total_points, 1)
+  end subroutine phdf5_point_1d_real128
+
+  subroutine phdf5_cell_1d_real128(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real128), intent(in) :: data(:)
+    character(len=*),  intent(in) :: field_name
+
+    if (self%gid_cdata < 0) then
+      write(error_unit,'(a)') 'ERROR phdf5_cell_1d_real128: cell_data group not open'
+      stop 1
+    end if
+    if (int(size(data, 1), int64) /= self%num_cells) then
+      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+    end if
+
+    call write_slab_real128_1d_(&
+      self%gid_cdata, trim(field_name), &
+      [int(size(data, 1), int64)], &
+      self%offset_cells, self%total_cells, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Cell', 'Float', 16, &
+      self%total_cells, 1)
+
+  end subroutine phdf5_cell_1d_real128
+
+  subroutine phdf5_point_2d_real128(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real128), intent(in) :: data(:, :)
+    character(len=*), intent(in) :: field_name
+
+    if (int(size(data, 2), int64) /= self%num_points) then
+      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+    end if
+    call write_slab_real128_2d_(&
+      self%gid_pdata, trim(field_name), &
+      [int(size(data, 1), int64), int(size(data, 2), int64)], &
+      self%offset_points, self%total_points, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Node', 'Float', 16, &
+      self%total_points, size(data, 1))
+  end subroutine phdf5_point_2d_real128
+
+  subroutine phdf5_cell_2d_real128(self, data, field_name)
+    class(t_phdf5_writer), intent(inout) :: self
+    real(real128), intent(in) :: data(:, :)
+    character(len=*),  intent(in) :: field_name
+
+    if (self%gid_cdata < 0) then
+      write(error_unit,'(a)') 'ERROR phdf5_cell_2d_real128: cell_data group not open'
+      stop 1
+    end if
+    if (int(size(data, 2), int64) /= self%num_cells) then
+      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+    end if
+
+    call write_slab_real128_2d_(&
+      self%gid_cdata, trim(field_name), &
+      [int(size(data, 1), int64), int(size(data, 2), int64)], &
+      self%offset_cells, self%total_cells, &
+      data, self%xfer_id&
+    )
+    call register_attribute_(self, field_name, 'Cell', 'Float', 16, &
+      self%total_cells, size(data, 1))
+
+  end subroutine phdf5_cell_2d_real128
+
+
+  !====================================================================
   ! プライベートヘルパー: HDF5 スラブ書き込み
   !
   ! 命名規則: write_{type}_{dim}d_slab_
@@ -487,200 +1619,677 @@ contains
   !   ファイルデータスペース: H5S_SELECT_NONE を選択
   !   メモリデータスペース : H5S_NULL (要素なし)
   !   -> 全ランクが Collective I/O に参加しつつデータ転送なし
+  !
+  ! This helper intentionally creates fixed-size datasets to preserve the
+  ! current XDMF layout.  A future time-series/misc writer based on
+  ! H5S_UNLIMITED should use a separate create/extend path.
   !====================================================================
-
-  ! float64 1D: [total_n] に [offset, offset+n) を書く
-  subroutine write_r64_1d_slab_(gid, dname, n, offset, total_n, data, xfer_id)
-    integer(HID_T),   intent(in) :: gid, xfer_id
-    character(len=*), intent(in) :: dname
-    integer(int64),   intent(in) :: n, offset, total_n
-    real(real64),     intent(in) :: data(*)
+  subroutine write_slab_int8_1d_(gid, dname, dims, offset, n_total, data, xfer_id)
+    integer(HID_T),     intent(in) :: gid, xfer_id
+    character(len=*),   intent(in) :: dname
+    integer(int64),     intent(in) :: dims(1)
+    integer(int64),     intent(in) :: offset, n_total
+    integer(int8), intent(in) :: data(:)
     integer :: hdferr
     integer(HID_T)   :: fsid, msid, did
     integer(HSIZE_T) :: dims_f(1), dims_m(1), hstart(1), hcount(1)
+    integer(HID_T)   :: h5t_native_kind
 
-    dims_f(1) = int(total_n, HSIZE_T)
+    h5t_native_kind = h5kind_to_type(int8, H5_integer_KIND)
+
+    ! Assign file dataspace dimensions
+    dims_f(1) = int(n_total, HSIZE_T)
+
     call h5screate_simple_f(1, dims_f, fsid, hdferr)
-    call h5dcreate_f(gid, dname, H5T_NATIVE_DOUBLE, fsid, did, hdferr)
+    call h5dcreate_f(gid, dname, h5t_native_kind, fsid, did, hdferr)
 
-    dims_m(1) = int(max(n, 1_int64), HSIZE_T)   ! ダミー値 (n=0 時)
-    if (n > 0) then
+    dims_m(1) = int(max(dims(1), 1_int64), HSIZE_T)
+    if (dims(1) > 0_int64) then
       hstart(1) = int(offset, HSIZE_T)
-      hcount(1) = int(n,      HSIZE_T)
+      hcount(1) = int(dims(1), HSIZE_T)
+      dims_m(1) = int(dims(1), HSIZE_T)
       call h5sselect_hyperslab_f(fsid, H5S_SELECT_SET_F, hstart, hcount, hdferr)
-      dims_m(1) = int(n, HSIZE_T)
       call h5screate_simple_f(1, dims_m, msid, hdferr)
     else
       call h5sselect_none_f(fsid, hdferr)
       call h5screate_f(H5S_NULL_F, msid, hdferr)
     end if
 
-    call h5dwrite_f(did, H5T_NATIVE_DOUBLE, data, dims_m, hdferr, &
-                    mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
-
+    call h5dwrite_f(&
+      did, h5t_native_kind, data, dims_m, hdferr, &
+      mem_space_id=msid, &
+      file_space_id=fsid, &
+      xfer_prp=xfer_id &
+    )
     call h5dclose_f(did, hdferr)
     call h5sclose_f(fsid, hdferr)
     call h5sclose_f(msid, hdferr)
-  end subroutine write_r64_1d_slab_
+  end subroutine write_slab_int8_1d_
 
-  ! float64 2D: Fortran (ncomp, n) -> HDF5 C [total_n][ncomp]
-  subroutine write_r64_2d_slab_(gid, dname, ncomp, n, offset, total_n, data, xfer_id)
-    integer(HID_T),   intent(in) :: gid, xfer_id
-    character(len=*), intent(in) :: dname
-    integer(int64),   intent(in) :: ncomp, n, offset, total_n
-    real(real64),     intent(in) :: data(ncomp, *)
+  subroutine write_slab_int8_2d_(gid, dname, dims, offset, n_total, data, xfer_id)
+    integer(HID_T),     intent(in) :: gid, xfer_id
+    character(len=*),   intent(in) :: dname
+    integer(int64),     intent(in) :: dims(2)
+    integer(int64),     intent(in) :: offset, n_total
+    integer(int8), intent(in) :: data(:, :)
     integer :: hdferr
     integer(HID_T)   :: fsid, msid, did
     integer(HSIZE_T) :: dims_f(2), dims_m(2), hstart(2), hcount(2)
+    integer(HID_T)   :: h5t_native_kind
 
-    ! Fortran 列優先 (ncomp, n) -> HDF5 API では dims(1) が速変方向
-    ! ファイルには C 行優先 [total_n][ncomp] として格納
-    dims_f(1) = int(ncomp,   HSIZE_T)
-    dims_f(2) = int(total_n, HSIZE_T)
+    h5t_native_kind = h5kind_to_type(int8, H5_integer_KIND)
+
+    ! Assign file dataspace dimensions
+    dims_f(1) = int(dims(1), HSIZE_T)
+    dims_f(2) = int(n_total, HSIZE_T)
+
     call h5screate_simple_f(2, dims_f, fsid, hdferr)
-    call h5dcreate_f(gid, dname, H5T_NATIVE_DOUBLE, fsid, did, hdferr)
+    call h5dcreate_f(gid, dname, h5t_native_kind, fsid, did, hdferr)
 
-    dims_m(1) = int(ncomp, HSIZE_T)
-    dims_m(2) = int(max(n, 1_int64), HSIZE_T)   ! ダミー値 (n=0 時)
-    if (n > 0) then
-      hstart(1) = 0_HSIZE_T        ! ncomp 方向は全成分
+    dims_m(1) = int(dims(1), HSIZE_T)
+    dims_m(2) = int(max(dims(2), 1_int64), HSIZE_T)
+    if (dims(2) > 0_int64) then
+      hstart(1) = int(0, HSIZE_T)
+      hcount(1) = int(dims(1), HSIZE_T)
       hstart(2) = int(offset, HSIZE_T)
-      hcount(1) = int(ncomp, HSIZE_T)
-      hcount(2) = int(n,     HSIZE_T)
+      hcount(2) = int(dims(2), HSIZE_T)
+      dims_m(2) = int(dims(2), HSIZE_T)
       call h5sselect_hyperslab_f(fsid, H5S_SELECT_SET_F, hstart, hcount, hdferr)
-      dims_m(2) = int(n, HSIZE_T)
       call h5screate_simple_f(2, dims_m, msid, hdferr)
     else
       call h5sselect_none_f(fsid, hdferr)
       call h5screate_f(H5S_NULL_F, msid, hdferr)
     end if
 
-    call h5dwrite_f(did, H5T_NATIVE_DOUBLE, data, dims_m, hdferr, &
-                    mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
+    call h5dwrite_f(&
+      did, h5t_native_kind, data, dims_m, hdferr, &
+      mem_space_id=msid, &
+      file_space_id=fsid, &
+      xfer_prp=xfer_id &
+    )
     call h5dclose_f(did, hdferr)
     call h5sclose_f(fsid, hdferr)
     call h5sclose_f(msid, hdferr)
-  end subroutine write_r64_2d_slab_
+  end subroutine write_slab_int8_2d_
 
-  ! int32 1D: [total_n] に [offset, offset+n) を書く
-  subroutine write_i32_1d_slab_(gid, dname, n, offset, total_n, data, xfer_id)
-    integer(HID_T),   intent(in) :: gid, xfer_id
-    character(len=*), intent(in) :: dname
-    integer(int64),   intent(in) :: n, offset, total_n
-    integer(int32),   intent(in) :: data(*)
+  subroutine write_slab_int16_1d_(gid, dname, dims, offset, n_total, data, xfer_id)
+    integer(HID_T),     intent(in) :: gid, xfer_id
+    character(len=*),   intent(in) :: dname
+    integer(int64),     intent(in) :: dims(1)
+    integer(int64),     intent(in) :: offset, n_total
+    integer(int16), intent(in) :: data(:)
     integer :: hdferr
     integer(HID_T)   :: fsid, msid, did
     integer(HSIZE_T) :: dims_f(1), dims_m(1), hstart(1), hcount(1)
+    integer(HID_T)   :: h5t_native_kind
 
-    dims_f(1) = int(total_n, HSIZE_T)
+    h5t_native_kind = h5kind_to_type(int16, H5_integer_KIND)
+
+    ! Assign file dataspace dimensions
+    dims_f(1) = int(n_total, HSIZE_T)
+
     call h5screate_simple_f(1, dims_f, fsid, hdferr)
-    h5t_i32_ = h5kind_to_type(int32, H5_INTEGER_KIND)
-    call h5dcreate_f(gid, dname, h5t_i32_, fsid, did, hdferr)
+    call h5dcreate_f(gid, dname, h5t_native_kind, fsid, did, hdferr)
 
-    dims_m(1) = int(max(n, 1_int64), HSIZE_T)   ! ダミー値 (n=0 時)
-    if (n > 0) then
+    dims_m(1) = int(max(dims(1), 1_int64), HSIZE_T)
+    if (dims(1) > 0_int64) then
       hstart(1) = int(offset, HSIZE_T)
-      hcount(1) = int(n,      HSIZE_T)
+      hcount(1) = int(dims(1), HSIZE_T)
+      dims_m(1) = int(dims(1), HSIZE_T)
       call h5sselect_hyperslab_f(fsid, H5S_SELECT_SET_F, hstart, hcount, hdferr)
-      dims_m(1) = int(n, HSIZE_T)
       call h5screate_simple_f(1, dims_m, msid, hdferr)
     else
       call h5sselect_none_f(fsid, hdferr)
       call h5screate_f(H5S_NULL_F, msid, hdferr)
     end if
 
-    call h5dwrite_f(did, h5t_i32_, data, dims_m, hdferr, &
-                    mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
+    call h5dwrite_f(&
+      did, h5t_native_kind, data, dims_m, hdferr, &
+      mem_space_id=msid, &
+      file_space_id=fsid, &
+      xfer_prp=xfer_id &
+    )
     call h5dclose_f(did, hdferr)
     call h5sclose_f(fsid, hdferr)
     call h5sclose_f(msid, hdferr)
-  end subroutine write_i32_1d_slab_
+  end subroutine write_slab_int16_1d_
 
-  ! int64 2D: Fortran (ncomp, n) -> HDF5 C [total_n][ncomp]
-  subroutine write_i64_2d_slab_(gid, dname, ncomp, n, offset, total_n, data, xfer_id)
-    integer(HID_T),   intent(in) :: gid, xfer_id
-    character(len=*), intent(in) :: dname
-    integer(int64),   intent(in) :: ncomp, n, offset, total_n
-    integer(int64),   intent(in) :: data(ncomp, *)
+  subroutine write_slab_int16_2d_(gid, dname, dims, offset, n_total, data, xfer_id)
+    integer(HID_T),     intent(in) :: gid, xfer_id
+    character(len=*),   intent(in) :: dname
+    integer(int64),     intent(in) :: dims(2)
+    integer(int64),     intent(in) :: offset, n_total
+    integer(int16), intent(in) :: data(:, :)
     integer :: hdferr
     integer(HID_T)   :: fsid, msid, did
     integer(HSIZE_T) :: dims_f(2), dims_m(2), hstart(2), hcount(2)
+    integer(HID_T)   :: h5t_native_kind
 
-    dims_f(1) = int(ncomp,   HSIZE_T)
-    dims_f(2) = int(total_n, HSIZE_T)
+    h5t_native_kind = h5kind_to_type(int16, H5_integer_KIND)
+
+    ! Assign file dataspace dimensions
+    dims_f(1) = int(dims(1), HSIZE_T)
+    dims_f(2) = int(n_total, HSIZE_T)
+
     call h5screate_simple_f(2, dims_f, fsid, hdferr)
-    h5t_i64_ = h5kind_to_type(int64, H5_INTEGER_KIND)
-    call h5dcreate_f(gid, dname, h5t_i64_, fsid, did, hdferr)
+    call h5dcreate_f(gid, dname, h5t_native_kind, fsid, did, hdferr)
 
-    dims_m(1) = int(ncomp, HSIZE_T)
-    dims_m(2) = int(max(n, 1_int64), HSIZE_T)   ! ダミー値 (n=0 時)
-    if (n > 0) then
-      hstart(1) = 0_HSIZE_T
+    dims_m(1) = int(dims(1), HSIZE_T)
+    dims_m(2) = int(max(dims(2), 1_int64), HSIZE_T)
+    if (dims(2) > 0_int64) then
+      hstart(1) = int(0, HSIZE_T)
+      hcount(1) = int(dims(1), HSIZE_T)
       hstart(2) = int(offset, HSIZE_T)
-      hcount(1) = int(ncomp, HSIZE_T)
-      hcount(2) = int(n,     HSIZE_T)
+      hcount(2) = int(dims(2), HSIZE_T)
+      dims_m(2) = int(dims(2), HSIZE_T)
       call h5sselect_hyperslab_f(fsid, H5S_SELECT_SET_F, hstart, hcount, hdferr)
-      dims_m(2) = int(n, HSIZE_T)
       call h5screate_simple_f(2, dims_m, msid, hdferr)
     else
       call h5sselect_none_f(fsid, hdferr)
       call h5screate_f(H5S_NULL_F, msid, hdferr)
     end if
 
-    call h5dwrite_f(did, h5t_i64_, data, dims_m, hdferr, &
-                    mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
+    call h5dwrite_f(&
+      did, h5t_native_kind, data, dims_m, hdferr, &
+      mem_space_id=msid, &
+      file_space_id=fsid, &
+      xfer_prp=xfer_id &
+    )
     call h5dclose_f(did, hdferr)
     call h5sclose_f(fsid, hdferr)
     call h5sclose_f(msid, hdferr)
-  end subroutine write_i64_2d_slab_
-  subroutine write_i32_2d_slab_(gid, dname, ncomp, n, offset, total_n, data, xfer_id)
-    integer(HID_T),   intent(in) :: gid, xfer_id
-    character(len=*), intent(in) :: dname
-    integer(int64),   intent(in) :: ncomp, n, offset, total_n
-    integer(int32),   intent(in) :: data(ncomp, *)
+  end subroutine write_slab_int16_2d_
+
+  subroutine write_slab_int32_1d_(gid, dname, dims, offset, n_total, data, xfer_id)
+    integer(HID_T),     intent(in) :: gid, xfer_id
+    character(len=*),   intent(in) :: dname
+    integer(int64),     intent(in) :: dims(1)
+    integer(int64),     intent(in) :: offset, n_total
+    integer(int32), intent(in) :: data(:)
+    integer :: hdferr
+    integer(HID_T)   :: fsid, msid, did
+    integer(HSIZE_T) :: dims_f(1), dims_m(1), hstart(1), hcount(1)
+    integer(HID_T)   :: h5t_native_kind
+
+    h5t_native_kind = h5kind_to_type(int32, H5_integer_KIND)
+
+    ! Assign file dataspace dimensions
+    dims_f(1) = int(n_total, HSIZE_T)
+
+    call h5screate_simple_f(1, dims_f, fsid, hdferr)
+    call h5dcreate_f(gid, dname, h5t_native_kind, fsid, did, hdferr)
+
+    dims_m(1) = int(max(dims(1), 1_int64), HSIZE_T)
+    if (dims(1) > 0_int64) then
+      hstart(1) = int(offset, HSIZE_T)
+      hcount(1) = int(dims(1), HSIZE_T)
+      dims_m(1) = int(dims(1), HSIZE_T)
+      call h5sselect_hyperslab_f(fsid, H5S_SELECT_SET_F, hstart, hcount, hdferr)
+      call h5screate_simple_f(1, dims_m, msid, hdferr)
+    else
+      call h5sselect_none_f(fsid, hdferr)
+      call h5screate_f(H5S_NULL_F, msid, hdferr)
+    end if
+
+    call h5dwrite_f(&
+      did, h5t_native_kind, data, dims_m, hdferr, &
+      mem_space_id=msid, &
+      file_space_id=fsid, &
+      xfer_prp=xfer_id &
+    )
+    call h5dclose_f(did, hdferr)
+    call h5sclose_f(fsid, hdferr)
+    call h5sclose_f(msid, hdferr)
+  end subroutine write_slab_int32_1d_
+
+  subroutine write_slab_int32_2d_(gid, dname, dims, offset, n_total, data, xfer_id)
+    integer(HID_T),     intent(in) :: gid, xfer_id
+    character(len=*),   intent(in) :: dname
+    integer(int64),     intent(in) :: dims(2)
+    integer(int64),     intent(in) :: offset, n_total
+    integer(int32), intent(in) :: data(:, :)
     integer :: hdferr
     integer(HID_T)   :: fsid, msid, did
     integer(HSIZE_T) :: dims_f(2), dims_m(2), hstart(2), hcount(2)
+    integer(HID_T)   :: h5t_native_kind
 
-    dims_f(1) = int(ncomp,   HSIZE_T)
-    dims_f(2) = int(total_n, HSIZE_T)
+    h5t_native_kind = h5kind_to_type(int32, H5_integer_KIND)
+
+    ! Assign file dataspace dimensions
+    dims_f(1) = int(dims(1), HSIZE_T)
+    dims_f(2) = int(n_total, HSIZE_T)
+
     call h5screate_simple_f(2, dims_f, fsid, hdferr)
-    h5t_i32_ = h5kind_to_type(int32, H5_INTEGER_KIND)
-    call h5dcreate_f(gid, dname, h5t_i32_, fsid, did, hdferr)
+    call h5dcreate_f(gid, dname, h5t_native_kind, fsid, did, hdferr)
 
-    dims_m(1) = int(ncomp, HSIZE_T)
-    dims_m(2) = int(max(n, 1_int64), HSIZE_T)   ! ダミー値 (n=0 時)
-    if (n > 0) then
-      hstart(1) = 0_HSIZE_T
+    dims_m(1) = int(dims(1), HSIZE_T)
+    dims_m(2) = int(max(dims(2), 1_int64), HSIZE_T)
+    if (dims(2) > 0_int64) then
+      hstart(1) = int(0, HSIZE_T)
+      hcount(1) = int(dims(1), HSIZE_T)
       hstart(2) = int(offset, HSIZE_T)
-      hcount(1) = int(ncomp, HSIZE_T)
-      hcount(2) = int(n,     HSIZE_T)
+      hcount(2) = int(dims(2), HSIZE_T)
+      dims_m(2) = int(dims(2), HSIZE_T)
       call h5sselect_hyperslab_f(fsid, H5S_SELECT_SET_F, hstart, hcount, hdferr)
-      dims_m(2) = int(n, HSIZE_T)
       call h5screate_simple_f(2, dims_m, msid, hdferr)
     else
       call h5sselect_none_f(fsid, hdferr)
       call h5screate_f(H5S_NULL_F, msid, hdferr)
     end if
 
-    call h5dwrite_f(did, h5t_i32_, data, dims_m, hdferr, &
-                    mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
+    call h5dwrite_f(&
+      did, h5t_native_kind, data, dims_m, hdferr, &
+      mem_space_id=msid, &
+      file_space_id=fsid, &
+      xfer_prp=xfer_id &
+    )
     call h5dclose_f(did, hdferr)
     call h5sclose_f(fsid, hdferr)
     call h5sclose_f(msid, hdferr)
-  end subroutine write_i32_2d_slab_
+  end subroutine write_slab_int32_2d_
 
-  ! --------------------------------------------------------------------
-  ! int_fmt_: 整数を指定桁数でゼロ埋めした文字列に変換する内部ヘルパー
-  ! 例: int_fmt_(42, 4) -> '0042'
-  ! --------------------------------------------------------------------
-  function int_fmt_(val, digits) result(s)
-    integer, intent(in) :: val, digits
-    character(len=32) :: s, fmt
-    write(fmt,'(a,i0,a,i0,a)') '(i', max(digits, 20), '.', digits, ')'
-    write(s, fmt) val
-    s = adjustl(s)
-  end function int_fmt_
+  subroutine write_slab_int64_1d_(gid, dname, dims, offset, n_total, data, xfer_id)
+    integer(HID_T),     intent(in) :: gid, xfer_id
+    character(len=*),   intent(in) :: dname
+    integer(int64),     intent(in) :: dims(1)
+    integer(int64),     intent(in) :: offset, n_total
+    integer(int64), intent(in) :: data(:)
+    integer :: hdferr
+    integer(HID_T)   :: fsid, msid, did
+    integer(HSIZE_T) :: dims_f(1), dims_m(1), hstart(1), hcount(1)
+    integer(HID_T)   :: h5t_native_kind
+
+    h5t_native_kind = h5kind_to_type(int64, H5_integer_KIND)
+
+    ! Assign file dataspace dimensions
+    dims_f(1) = int(n_total, HSIZE_T)
+
+    call h5screate_simple_f(1, dims_f, fsid, hdferr)
+    call h5dcreate_f(gid, dname, h5t_native_kind, fsid, did, hdferr)
+
+    dims_m(1) = int(max(dims(1), 1_int64), HSIZE_T)
+    if (dims(1) > 0_int64) then
+      hstart(1) = int(offset, HSIZE_T)
+      hcount(1) = int(dims(1), HSIZE_T)
+      dims_m(1) = int(dims(1), HSIZE_T)
+      call h5sselect_hyperslab_f(fsid, H5S_SELECT_SET_F, hstart, hcount, hdferr)
+      call h5screate_simple_f(1, dims_m, msid, hdferr)
+    else
+      call h5sselect_none_f(fsid, hdferr)
+      call h5screate_f(H5S_NULL_F, msid, hdferr)
+    end if
+
+    call h5dwrite_f(&
+      did, h5t_native_kind, data, dims_m, hdferr, &
+      mem_space_id=msid, &
+      file_space_id=fsid, &
+      xfer_prp=xfer_id &
+    )
+    call h5dclose_f(did, hdferr)
+    call h5sclose_f(fsid, hdferr)
+    call h5sclose_f(msid, hdferr)
+  end subroutine write_slab_int64_1d_
+
+  subroutine write_slab_int64_2d_(gid, dname, dims, offset, n_total, data, xfer_id)
+    integer(HID_T),     intent(in) :: gid, xfer_id
+    character(len=*),   intent(in) :: dname
+    integer(int64),     intent(in) :: dims(2)
+    integer(int64),     intent(in) :: offset, n_total
+    integer(int64), intent(in) :: data(:, :)
+    integer :: hdferr
+    integer(HID_T)   :: fsid, msid, did
+    integer(HSIZE_T) :: dims_f(2), dims_m(2), hstart(2), hcount(2)
+    integer(HID_T)   :: h5t_native_kind
+
+    h5t_native_kind = h5kind_to_type(int64, H5_integer_KIND)
+
+    ! Assign file dataspace dimensions
+    dims_f(1) = int(dims(1), HSIZE_T)
+    dims_f(2) = int(n_total, HSIZE_T)
+
+    call h5screate_simple_f(2, dims_f, fsid, hdferr)
+    call h5dcreate_f(gid, dname, h5t_native_kind, fsid, did, hdferr)
+
+    dims_m(1) = int(dims(1), HSIZE_T)
+    dims_m(2) = int(max(dims(2), 1_int64), HSIZE_T)
+    if (dims(2) > 0_int64) then
+      hstart(1) = int(0, HSIZE_T)
+      hcount(1) = int(dims(1), HSIZE_T)
+      hstart(2) = int(offset, HSIZE_T)
+      hcount(2) = int(dims(2), HSIZE_T)
+      dims_m(2) = int(dims(2), HSIZE_T)
+      call h5sselect_hyperslab_f(fsid, H5S_SELECT_SET_F, hstart, hcount, hdferr)
+      call h5screate_simple_f(2, dims_m, msid, hdferr)
+    else
+      call h5sselect_none_f(fsid, hdferr)
+      call h5screate_f(H5S_NULL_F, msid, hdferr)
+    end if
+
+    call h5dwrite_f(&
+      did, h5t_native_kind, data, dims_m, hdferr, &
+      mem_space_id=msid, &
+      file_space_id=fsid, &
+      xfer_prp=xfer_id &
+    )
+    call h5dclose_f(did, hdferr)
+    call h5sclose_f(fsid, hdferr)
+    call h5sclose_f(msid, hdferr)
+  end subroutine write_slab_int64_2d_
+
+  subroutine write_slab_real32_1d_(gid, dname, dims, offset, n_total, data, xfer_id)
+    integer(HID_T),     intent(in) :: gid, xfer_id
+    character(len=*),   intent(in) :: dname
+    integer(int64),     intent(in) :: dims(1)
+    integer(int64),     intent(in) :: offset, n_total
+    real(real32), intent(in) :: data(:)
+    integer :: hdferr
+    integer(HID_T)   :: fsid, msid, did
+    integer(HSIZE_T) :: dims_f(1), dims_m(1), hstart(1), hcount(1)
+    integer(HID_T)   :: h5t_native_kind
+
+    h5t_native_kind = h5kind_to_type(real32, H5_real_KIND)
+
+    ! Assign file dataspace dimensions
+    dims_f(1) = int(n_total, HSIZE_T)
+
+    call h5screate_simple_f(1, dims_f, fsid, hdferr)
+    call h5dcreate_f(gid, dname, h5t_native_kind, fsid, did, hdferr)
+
+    dims_m(1) = int(max(dims(1), 1_int64), HSIZE_T)
+    if (dims(1) > 0_int64) then
+      hstart(1) = int(offset, HSIZE_T)
+      hcount(1) = int(dims(1), HSIZE_T)
+      dims_m(1) = int(dims(1), HSIZE_T)
+      call h5sselect_hyperslab_f(fsid, H5S_SELECT_SET_F, hstart, hcount, hdferr)
+      call h5screate_simple_f(1, dims_m, msid, hdferr)
+    else
+      call h5sselect_none_f(fsid, hdferr)
+      call h5screate_f(H5S_NULL_F, msid, hdferr)
+    end if
+
+    call h5dwrite_f(&
+      did, h5t_native_kind, data, dims_m, hdferr, &
+      mem_space_id=msid, &
+      file_space_id=fsid, &
+      xfer_prp=xfer_id &
+    )
+    call h5dclose_f(did, hdferr)
+    call h5sclose_f(fsid, hdferr)
+    call h5sclose_f(msid, hdferr)
+  end subroutine write_slab_real32_1d_
+
+  subroutine write_slab_real32_2d_(gid, dname, dims, offset, n_total, data, xfer_id)
+    integer(HID_T),     intent(in) :: gid, xfer_id
+    character(len=*),   intent(in) :: dname
+    integer(int64),     intent(in) :: dims(2)
+    integer(int64),     intent(in) :: offset, n_total
+    real(real32), intent(in) :: data(:, :)
+    integer :: hdferr
+    integer(HID_T)   :: fsid, msid, did
+    integer(HSIZE_T) :: dims_f(2), dims_m(2), hstart(2), hcount(2)
+    integer(HID_T)   :: h5t_native_kind
+
+    h5t_native_kind = h5kind_to_type(real32, H5_real_KIND)
+
+    ! Assign file dataspace dimensions
+    dims_f(1) = int(dims(1), HSIZE_T)
+    dims_f(2) = int(n_total, HSIZE_T)
+
+    call h5screate_simple_f(2, dims_f, fsid, hdferr)
+    call h5dcreate_f(gid, dname, h5t_native_kind, fsid, did, hdferr)
+
+    dims_m(1) = int(dims(1), HSIZE_T)
+    dims_m(2) = int(max(dims(2), 1_int64), HSIZE_T)
+    if (dims(2) > 0_int64) then
+      hstart(1) = int(0, HSIZE_T)
+      hcount(1) = int(dims(1), HSIZE_T)
+      hstart(2) = int(offset, HSIZE_T)
+      hcount(2) = int(dims(2), HSIZE_T)
+      dims_m(2) = int(dims(2), HSIZE_T)
+      call h5sselect_hyperslab_f(fsid, H5S_SELECT_SET_F, hstart, hcount, hdferr)
+      call h5screate_simple_f(2, dims_m, msid, hdferr)
+    else
+      call h5sselect_none_f(fsid, hdferr)
+      call h5screate_f(H5S_NULL_F, msid, hdferr)
+    end if
+
+    call h5dwrite_f(&
+      did, h5t_native_kind, data, dims_m, hdferr, &
+      mem_space_id=msid, &
+      file_space_id=fsid, &
+      xfer_prp=xfer_id &
+    )
+    call h5dclose_f(did, hdferr)
+    call h5sclose_f(fsid, hdferr)
+    call h5sclose_f(msid, hdferr)
+  end subroutine write_slab_real32_2d_
+
+  subroutine write_slab_real64_1d_(gid, dname, dims, offset, n_total, data, xfer_id)
+    integer(HID_T),     intent(in) :: gid, xfer_id
+    character(len=*),   intent(in) :: dname
+    integer(int64),     intent(in) :: dims(1)
+    integer(int64),     intent(in) :: offset, n_total
+    real(real64), intent(in) :: data(:)
+    integer :: hdferr
+    integer(HID_T)   :: fsid, msid, did
+    integer(HSIZE_T) :: dims_f(1), dims_m(1), hstart(1), hcount(1)
+    integer(HID_T)   :: h5t_native_kind
+
+    h5t_native_kind = h5kind_to_type(real64, H5_real_KIND)
+
+    ! Assign file dataspace dimensions
+    dims_f(1) = int(n_total, HSIZE_T)
+
+    call h5screate_simple_f(1, dims_f, fsid, hdferr)
+    call h5dcreate_f(gid, dname, h5t_native_kind, fsid, did, hdferr)
+
+    dims_m(1) = int(max(dims(1), 1_int64), HSIZE_T)
+    if (dims(1) > 0_int64) then
+      hstart(1) = int(offset, HSIZE_T)
+      hcount(1) = int(dims(1), HSIZE_T)
+      dims_m(1) = int(dims(1), HSIZE_T)
+      call h5sselect_hyperslab_f(fsid, H5S_SELECT_SET_F, hstart, hcount, hdferr)
+      call h5screate_simple_f(1, dims_m, msid, hdferr)
+    else
+      call h5sselect_none_f(fsid, hdferr)
+      call h5screate_f(H5S_NULL_F, msid, hdferr)
+    end if
+
+    call h5dwrite_f(&
+      did, h5t_native_kind, data, dims_m, hdferr, &
+      mem_space_id=msid, &
+      file_space_id=fsid, &
+      xfer_prp=xfer_id &
+    )
+    call h5dclose_f(did, hdferr)
+    call h5sclose_f(fsid, hdferr)
+    call h5sclose_f(msid, hdferr)
+  end subroutine write_slab_real64_1d_
+
+  subroutine write_slab_real64_2d_(gid, dname, dims, offset, n_total, data, xfer_id)
+    integer(HID_T),     intent(in) :: gid, xfer_id
+    character(len=*),   intent(in) :: dname
+    integer(int64),     intent(in) :: dims(2)
+    integer(int64),     intent(in) :: offset, n_total
+    real(real64), intent(in) :: data(:, :)
+    integer :: hdferr
+    integer(HID_T)   :: fsid, msid, did
+    integer(HSIZE_T) :: dims_f(2), dims_m(2), hstart(2), hcount(2)
+    integer(HID_T)   :: h5t_native_kind
+
+    h5t_native_kind = h5kind_to_type(real64, H5_real_KIND)
+
+    ! Assign file dataspace dimensions
+    dims_f(1) = int(dims(1), HSIZE_T)
+    dims_f(2) = int(n_total, HSIZE_T)
+
+    call h5screate_simple_f(2, dims_f, fsid, hdferr)
+    call h5dcreate_f(gid, dname, h5t_native_kind, fsid, did, hdferr)
+
+    dims_m(1) = int(dims(1), HSIZE_T)
+    dims_m(2) = int(max(dims(2), 1_int64), HSIZE_T)
+    if (dims(2) > 0_int64) then
+      hstart(1) = int(0, HSIZE_T)
+      hcount(1) = int(dims(1), HSIZE_T)
+      hstart(2) = int(offset, HSIZE_T)
+      hcount(2) = int(dims(2), HSIZE_T)
+      dims_m(2) = int(dims(2), HSIZE_T)
+      call h5sselect_hyperslab_f(fsid, H5S_SELECT_SET_F, hstart, hcount, hdferr)
+      call h5screate_simple_f(2, dims_m, msid, hdferr)
+    else
+      call h5sselect_none_f(fsid, hdferr)
+      call h5screate_f(H5S_NULL_F, msid, hdferr)
+    end if
+
+    call h5dwrite_f(&
+      did, h5t_native_kind, data, dims_m, hdferr, &
+      mem_space_id=msid, &
+      file_space_id=fsid, &
+      xfer_prp=xfer_id &
+    )
+    call h5dclose_f(did, hdferr)
+    call h5sclose_f(fsid, hdferr)
+    call h5sclose_f(msid, hdferr)
+  end subroutine write_slab_real64_2d_
+
+  subroutine write_slab_real128_1d_(gid, dname, dims, offset, n_total, data, xfer_id)
+    integer(HID_T),     intent(in) :: gid, xfer_id
+    character(len=*),   intent(in) :: dname
+    integer(int64),     intent(in) :: dims(1)
+    integer(int64),     intent(in) :: offset, n_total
+    real(real128), intent(in) :: data(:)
+    integer :: hdferr
+    integer(HID_T)   :: fsid, msid, did
+    integer(HSIZE_T) :: dims_f(1), dims_m(1), hstart(1), hcount(1)
+    integer(HID_T)   :: h5t_native_kind
+
+    h5t_native_kind = h5kind_to_type(real128, H5_real_KIND)
+
+    ! Assign file dataspace dimensions
+    dims_f(1) = int(n_total, HSIZE_T)
+
+    call h5screate_simple_f(1, dims_f, fsid, hdferr)
+    call h5dcreate_f(gid, dname, h5t_native_kind, fsid, did, hdferr)
+
+    dims_m(1) = int(max(dims(1), 1_int64), HSIZE_T)
+    if (dims(1) > 0_int64) then
+      hstart(1) = int(offset, HSIZE_T)
+      hcount(1) = int(dims(1), HSIZE_T)
+      dims_m(1) = int(dims(1), HSIZE_T)
+      call h5sselect_hyperslab_f(fsid, H5S_SELECT_SET_F, hstart, hcount, hdferr)
+      call h5screate_simple_f(1, dims_m, msid, hdferr)
+    else
+      call h5sselect_none_f(fsid, hdferr)
+      call h5screate_f(H5S_NULL_F, msid, hdferr)
+    end if
+
+    call h5dwrite_f(&
+      did, h5t_native_kind, data, dims_m, hdferr, &
+      mem_space_id=msid, &
+      file_space_id=fsid, &
+      xfer_prp=xfer_id &
+    )
+    call h5dclose_f(did, hdferr)
+    call h5sclose_f(fsid, hdferr)
+    call h5sclose_f(msid, hdferr)
+  end subroutine write_slab_real128_1d_
+
+  subroutine write_slab_real128_2d_(gid, dname, dims, offset, n_total, data, xfer_id)
+    integer(HID_T),     intent(in) :: gid, xfer_id
+    character(len=*),   intent(in) :: dname
+    integer(int64),     intent(in) :: dims(2)
+    integer(int64),     intent(in) :: offset, n_total
+    real(real128), intent(in) :: data(:, :)
+    integer :: hdferr
+    integer(HID_T)   :: fsid, msid, did
+    integer(HSIZE_T) :: dims_f(2), dims_m(2), hstart(2), hcount(2)
+    integer(HID_T)   :: h5t_native_kind
+
+    h5t_native_kind = h5kind_to_type(real128, H5_real_KIND)
+
+    ! Assign file dataspace dimensions
+    dims_f(1) = int(dims(1), HSIZE_T)
+    dims_f(2) = int(n_total, HSIZE_T)
+
+    call h5screate_simple_f(2, dims_f, fsid, hdferr)
+    call h5dcreate_f(gid, dname, h5t_native_kind, fsid, did, hdferr)
+
+    dims_m(1) = int(dims(1), HSIZE_T)
+    dims_m(2) = int(max(dims(2), 1_int64), HSIZE_T)
+    if (dims(2) > 0_int64) then
+      hstart(1) = int(0, HSIZE_T)
+      hcount(1) = int(dims(1), HSIZE_T)
+      hstart(2) = int(offset, HSIZE_T)
+      hcount(2) = int(dims(2), HSIZE_T)
+      dims_m(2) = int(dims(2), HSIZE_T)
+      call h5sselect_hyperslab_f(fsid, H5S_SELECT_SET_F, hstart, hcount, hdferr)
+      call h5screate_simple_f(2, dims_m, msid, hdferr)
+    else
+      call h5sselect_none_f(fsid, hdferr)
+      call h5screate_f(H5S_NULL_F, msid, hdferr)
+    end if
+
+    call h5dwrite_f(&
+      did, h5t_native_kind, data, dims_m, hdferr, &
+      mem_space_id=msid, &
+      file_space_id=fsid, &
+      xfer_prp=xfer_id &
+    )
+    call h5dclose_f(did, hdferr)
+    call h5sclose_f(fsid, hdferr)
+    call h5sclose_f(msid, hdferr)
+  end subroutine write_slab_real128_2d_
+
+
+  subroutine register_attribute_(self, field_name, center, num_type, precision, n_total, ncomp, update_existing)
+    class(t_phdf5_writer), intent(inout) :: self
+    character(len=*), intent(in) :: field_name, center, num_type
+    integer, intent(in) :: precision, ncomp
+    integer(int64), intent(in) :: n_total
+    logical, intent(in), optional :: update_existing
+    integer :: i, idx
+    logical :: update
+
+    update = .true.
+    if (present(update_existing)) update = update_existing
+    idx = 0
+    do i = 1, self%n_attrs
+      if (trim(self%attrs(i)%name) == trim(field_name) .and. &
+          trim(self%attrs(i)%center) == trim(center)) then
+        idx = i
+        exit
+      end if
+    end do
+    if (idx > 0 .and. .not. update) return
+    if (idx == 0) then
+      if (self%n_attrs >= MAX_ATTRS) then
+        error stop "[h5fortran/H5XDMF] too many attributes"
+      end if
+      self%n_attrs = self%n_attrs + 1
+      idx = self%n_attrs
+    end if
+
+    associate(a => self%attrs(idx))
+      a%name = trim(field_name)
+      a%center = trim(center)
+      a%num_type = trim(num_type)
+      a%precision = precision
+      a%n_total = n_total
+      a%ncomp = ncomp
+      select case (ncomp)
+      case (1)
+        a%attr_type = 'Scalar'
+      case (3)
+        a%attr_type = 'Vector'
+      case (6)
+        a%attr_type = 'Tensor6'
+      case (9)
+        a%attr_type = 'Tensor'
+      case default
+        error stop "[h5fortran/H5XDMF] ncomp must be 1, 3, 6, or 9"
+      end select
+    end associate
+  end subroutine register_attribute_
 
   ! --------------------------------------------------------------------
   ! add_point_attr_1d: スカラー点属性を登録
@@ -689,20 +2298,7 @@ contains
     class(t_phdf5_writer), intent(inout) :: self
     character(len=*), intent(in) :: field_name
 
-    self%n_attrs = self%n_attrs + 1
-    if (self%n_attrs > MAX_ATTRS) then
-      write(error_unit,'(a)') 'ERROR phdf5_xdmf: too many attributes'
-      stop 1
-    end if
-    associate(a => self%attrs(self%n_attrs))
-      a%name      = trim(field_name)
-      a%attr_type = 'Scalar'
-      a%center    = 'Node'
-      a%num_type  = 'Float'
-      a%precision = 8
-      a%n_total   = self%total_points
-      a%ncomp     = 1
-    end associate
+    call register_attribute_(self, field_name, 'Node', 'Float', 8, self%total_points, 1, .false.)
   end subroutine phdf5_xdmf_add_point_1d
 
   ! --------------------------------------------------------------------
@@ -713,30 +2309,7 @@ contains
     integer,          intent(in) :: ncomp
     character(len=*), intent(in) :: field_name
 
-    self%n_attrs = self%n_attrs + 1
-    if (self%n_attrs > MAX_ATTRS) then
-      write(error_unit,'(a)') 'ERROR phdf5_xdmf: too many attributes'
-      stop 1
-    end if
-    associate(a => self%attrs(self%n_attrs))
-      a%name    = trim(field_name)
-      a%center  = 'Node'
-      a%num_type  = 'Float'
-      a%precision = 8
-      a%n_total = self%total_points
-      a%ncomp   = ncomp
-      if (ncomp == 1) then
-        a%attr_type = 'Scalar'
-      else if (ncomp == 3) then
-        a%attr_type = 'Vector'
-      else if (ncomp == 6) then
-        a%attr_type = 'Tensor6'
-      else if (ncomp == 9) then
-        a%attr_type = 'Tensor'
-      else
-        write(error_unit,'(a,i0,a)') 'ERROR phdf5_xdmf: unsupported ncomp for point attribute: ', ncomp, ' (only 1,3,6,9 supported)'
-      end if
-    end associate
+    call register_attribute_(self, field_name, 'Node', 'Float', 8, self%total_points, ncomp, .false.)
   end subroutine phdf5_xdmf_add_point_2d
 
   ! --------------------------------------------------------------------
@@ -746,20 +2319,7 @@ contains
     class(t_phdf5_writer), intent(inout) :: self
     character(len=*), intent(in) :: field_name
 
-    self%n_attrs = self%n_attrs + 1
-    if (self%n_attrs > MAX_ATTRS) then
-      write(error_unit,'(a)') 'ERROR phdf5_xdmf: too many attributes'
-      stop 1
-    end if
-    associate(a => self%attrs(self%n_attrs))
-      a%name      = trim(field_name)
-      a%attr_type = 'Scalar'
-      a%center    = 'Cell'
-      a%num_type  = 'Int'
-      a%precision = 4
-      a%n_total   = self%total_cells
-      a%ncomp     = 1
-    end associate
+    call register_attribute_(self, field_name, 'Cell', 'Int', 4, self%total_cells, 1, .false.)
   end subroutine phdf5_xdmf_add_cell_i32
 
   ! --------------------------------------------------------------------
@@ -772,85 +2332,95 @@ contains
     class(t_phdf5_writer), intent(in) :: self
     character(len=512) :: part_path, h5_rel_path, group_prefix
     character(len=30) :: time_str
-    integer :: u, i
+    integer :: fid, i
 
-    ! .xdmf.part ファイルのパス
+    ! File path and name for .xdmf.part: e.g., 'metadata/seq00000_ugrid_phdf5.xdmf.part'
     write(part_path,'(a,a,a,a,a,a)') &
       trim(self%metadata_dir), '/seq', trim(int_fmt_(self%seq, self%seq_digits)), '_', &
       trim(self%output_type), '_phdf5.xdmf.part'
 
-    ! HDF5 ファイルへの相対パス (from metadata dir): e.g. ../phdf5/ts0000.h5
+    ! Relative path from .xdmf.part to .h5: e.g., '../phdf5/seq00000.h5'
     h5_rel_path = trim(self%rel_dir_meta2h5) // '/' // trim(self%h5_filename)
 
-    ! HDF5 グループのプリフィックス
+    ! Group prefix for datasets: e.g., 'ugrid' or 'polydata'
     group_prefix = trim(self%output_type)
 
-    open(newunit=u, file=trim(part_path), status='replace', action='write')
+    open(newunit=fid, file=trim(part_path), status='replace', action='write')
 
     write(time_str, '(es22.15e2)') self%time
-    write(u,'(a,a,a)') '<Time Value="', trim(time_str), '"/>'
+    write(fid,'(a,a,a)') '<Time Value="', trim(time_str), '"/>'
 
     ! FIXME: Precision を判定する
+    ! FIXME: TopologyType を Mixed などに対応する
     ! Topology
     if (trim(self%output_type) == 'ugrid') then
-      write(u,'(a,i0,a)') '<Topology TopologyType="Hexahedron" NumberOfElements="', self%total_cells, '">'
-      write(u,'(a,i0,a)') '  <DataItem Format="HDF" NumberType="Int" Precision="8" Dimensions="', self%total_cells, ' 8">'
-      write(u,'(a,a,a,a,a)') '    ', trim(h5_rel_path), ':/', trim(group_prefix), '/geometry/connectivity'
-      write(u,'(a)') '  </DataItem>'
-      write(u,'(a)') '</Topology>'
+      write(fid,'(a,i0,a)')    '<Topology TopologyType="Hexahedron" NumberOfElements="', self%total_cells, '">'
+      write(fid,'(a,i0,a,i0,a)') '  <DataItem Format="HDF" NumberType="Int" Precision="', &
+        self%topology_precision, '" Dimensions="', self%total_cells, ' 8">'
+      write(fid,'(a,a,a,a,a)') '    ', trim(h5_rel_path), ':/', trim(group_prefix), '/geometry/connectivity'
+      write(fid,'(a)')         '  </DataItem>'
+      write(fid,'(a)')         '</Topology>'
     else
-      write(u,'(a,i0,a)') '<Topology TopologyType="Polyvertex" NumberOfElements="', self%total_points, '" NodesPerElement="1"/>'
+      write(fid,'(a,i0,a)')    '<Topology TopologyType="Polyvertex" NumberOfElements="', self%total_points, '" NodesPerElement="1"/>'
     end if
 
     ! FIXME: Precision を判定する
     ! Geometry
-    write(u,'(a)') '<Geometry GeometryType="XYZ">'
-    write(u,'(a,i0,a)') '  <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="', self%total_points, ' 3">'
-    write(u,'(a,a,a,a,a)') '    ', trim(h5_rel_path), ':/', trim(group_prefix), '/geometry/nodes'
-    write(u,'(a)') '  </DataItem>'
-    write(u,'(a)') '</Geometry>'
+    write(fid,'(a)')         '<Geometry GeometryType="XYZ">'
+    write(fid,'(a,i0,a,i0,a)') '  <DataItem Format="HDF" NumberType="Float" Precision="', &
+      self%geometry_precision, '" Dimensions="', self%total_points, ' 3">'
+    write(fid,'(a,a,a,a,a)') '    ', trim(h5_rel_path), ':/', trim(group_prefix), '/geometry/nodes'
+    write(fid,'(a)')         '  </DataItem>'
+    write(fid,'(a)')         '</Geometry>'
 
     ! Attributes
     do i = 1, self%n_attrs
-      call write_global_attribute_(u, h5_rel_path, group_prefix, self%attrs(i))
+      call attr_(self%attrs(i))
     end do
 
-    close(u)
+    close(fid)
+  contains
+    ! --------------------------------------------------------------------
+    ! int_fmt_: 整数を指定桁数でゼロ埋めした文字列に変換する内部ヘルパー
+    ! 例: int_fmt_(42, 4) -> '0042'
+    ! --------------------------------------------------------------------
+    function int_fmt_(val, digits) result(s)
+      integer, intent(in) :: val, digits
+      character(len=32) :: s, fmt
+      write(fmt,'(a,i0,a,i0,a)') '(i', max(digits, 20), '.', digits, ')'
+      write(s, fmt) val
+      s = adjustl(s)
+    end function int_fmt_
+
+    subroutine attr_(attr)
+      type(t_phdf5_attr_info), intent(in) :: attr
+      character(len=32) :: data_group
+
+      if (trim(attr%center) == 'Node') then
+        data_group = 'point_data'
+      else
+        data_group = 'cell_data'
+      end if
+
+      write(fid,'(a,a,a,a,a,a,a)') '<Attribute Name="', trim(attr%name), &
+        '" AttributeType="', trim(attr%attr_type), '" Center="', trim(attr%center), '">'
+
+      if (attr%ncomp == 1) then
+        write(fid,'(a,a,a,i0,a,i0,a)') &
+          '  <DataItem Format="HDF" NumberType="', trim(attr%num_type), &
+          '" Precision="', attr%precision, '" Dimensions="', attr%n_total, '">'
+      else
+        write(fid,'(a,a,a,i0,a,i0,a,i0,a)') &
+          '  <DataItem Format="HDF" NumberType="', trim(attr%num_type), &
+          '" Precision="', attr%precision, '" Dimensions="', attr%n_total, &
+          ' ', attr%ncomp, '">'
+      end if
+
+      write(fid,'(a,a,a,a,a,a,a)') '    ', trim(h5_rel_path), ':/', &
+        trim(group_prefix), '/', trim(data_group), '/' // trim(attr%name)
+      write(fid,'(a)') '  </DataItem>'
+      write(fid,'(a)') '</Attribute>'
+    end subroutine attr_
   end subroutine phdf5_xdmf_write_fragment
-
-  ! --------------------------------------------------------------------
-  ! 内部ヘルパー: 属性要素を書く（グローバル dataset 直接参照）
-  ! --------------------------------------------------------------------
-  subroutine write_global_attribute_(u, h5_rel, group_prefix, attr)
-    integer, intent(in) :: u
-    character(len=*), intent(in) :: h5_rel, group_prefix
-    type(t_phdf5_attr_info), intent(in) :: attr
-    character(len=32) :: data_group
-
-    if (trim(attr%center) == 'Node') then
-      data_group = 'point_data'
-    else
-      data_group = 'cell_data'
-    end if
-
-    write(u,'(a,a,a,a,a,a,a)') '<Attribute Name="', trim(attr%name), &
-      '" AttributeType="', trim(attr%attr_type), '" Center="', trim(attr%center), '">'
-
-    if (attr%ncomp == 1) then
-      write(u,'(a,a,a,i0,a,i0,a)') &
-        '  <DataItem Format="HDF" NumberType="', trim(attr%num_type), &
-        '" Precision="', attr%precision, '" Dimensions="', attr%n_total, '">'
-    else
-      write(u,'(a,a,a,i0,a,i0,a,i0,a)') &
-        '  <DataItem Format="HDF" NumberType="', trim(attr%num_type), &
-        '" Precision="', attr%precision, '" Dimensions="', attr%n_total, &
-        ' ', attr%ncomp, '">'
-    end if
-
-    write(u,'(a,a,a,a,a,a,a)') '    ', trim(h5_rel), ':/', &
-      trim(group_prefix), '/', trim(data_group), '/' // trim(attr%name)
-    write(u,'(a)') '  </DataItem>'
-    write(u,'(a)') '</Attribute>'
-  end subroutine write_global_attribute_
 
 end module h5fort_parallel_hdf5_xdmf

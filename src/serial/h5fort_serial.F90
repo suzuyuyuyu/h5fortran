@@ -1,5 +1,6 @@
 ! DO NOT EDIT — generated from src/fypp/serial/h5fort_serial.fypp
-! To regenerate: scripts/generate_fypp.sh
+! To regenerate: src/fypp/generate_fypp.sh
+
 !==============================================================================
 ! Module: h5fort_serial_write
 !
@@ -41,6 +42,7 @@ module h5fort_serial
   public :: t_h5fort_serial
 
   public :: H5FORTRAN_FORCE_WRITE
+  public :: H5FORTRAN_READ_ONLY
 
   interface h5fort_swrite
     module procedure h5fort_write_r64_0d, h5fort_write_r64_1d, h5fort_write_r64_2d, h5fort_write_r64_3d, h5fort_write_r64_4d
@@ -62,6 +64,7 @@ module h5fort_serial
     module procedure h5fort_read_r64_1d_fixed, h5fort_read_r64_2d_fixed, h5fort_read_r64_3d_fixed, h5fort_read_r64_4d_fixed
     module procedure h5fort_read_r32_1d_fixed, h5fort_read_r32_2d_fixed, h5fort_read_r32_3d_fixed, h5fort_read_r32_4d_fixed
     module procedure h5fort_read_i32_1d_fixed, h5fort_read_i32_2d_fixed, h5fort_read_i32_3d_fixed, h5fort_read_i32_4d_fixed
+    module procedure h5fort_read_lgc_1d_fixed, h5fort_read_lgc_2d_fixed, h5fort_read_lgc_3d_fixed, h5fort_read_lgc_4d_fixed
   end interface h5fort_sread_fixed
 
   type :: t_h5fort_serial
@@ -172,6 +175,10 @@ module h5fort_serial
     procedure, private :: read_i32_2d_fixed => h5fort_serial_read_i32_2d_fixed
     procedure, private :: read_i32_3d_fixed => h5fort_serial_read_i32_3d_fixed
     procedure, private :: read_i32_4d_fixed => h5fort_serial_read_i32_4d_fixed
+    procedure, private :: read_lgc_1d_fixed => h5fort_serial_read_lgc_1d_fixed
+    procedure, private :: read_lgc_2d_fixed => h5fort_serial_read_lgc_2d_fixed
+    procedure, private :: read_lgc_3d_fixed => h5fort_serial_read_lgc_3d_fixed
+    procedure, private :: read_lgc_4d_fixed => h5fort_serial_read_lgc_4d_fixed
     generic, public :: read_fixed => &
       read_r64_1d_fixed, &
       read_r64_2d_fixed, &
@@ -184,7 +191,11 @@ module h5fort_serial
       read_i32_1d_fixed, &
       read_i32_2d_fixed, &
       read_i32_3d_fixed, &
-      read_i32_4d_fixed
+      read_i32_4d_fixed, &
+      read_lgc_1d_fixed, &
+      read_lgc_2d_fixed, &
+      read_lgc_3d_fixed, &
+      read_lgc_4d_fixed
   end type t_h5fort_serial
 
 
@@ -199,12 +210,23 @@ contains
     class(t_h5fort_serial), intent(inout) :: self
     integer, intent(in), optional :: mode
     integer :: mode_
+    self%hdferr = 0
+    if (.not. allocated(self%f_name)) then
+      self%hdferr = -1
+      return
+    end if
+    if (len_trim(self%f_name) == 0 .or. self%file_id >= 0_hid_t) then
+      self%hdferr = -1
+      return
+    end if
     mode_ = 0
     if (present(mode)) mode_ = mode
     call h5open_f(self%hdferr)
     if (self%hdferr /= 0) return
     if (mode_ == H5FORTRAN_FORCE_WRITE) then
       call h5fcreate_f(self%f_name, H5F_ACC_TRUNC_F, self%file_id, self%hdferr)
+    else if (mode_ == H5FORTRAN_READ_ONLY) then
+      call h5fopen_f(self%f_name, H5F_ACC_RDONLY_F, self%file_id, self%hdferr)
     else
       call h5fopen_f(self%f_name, H5F_ACC_RDWR_F, self%file_id, self%hdferr)
     end if
@@ -215,8 +237,16 @@ contains
   !============================================================================
   subroutine h5fort_serial_close(self)
     class(t_h5fort_serial), intent(inout) :: self
-    call h5fclose_f(self%file_id, self%hdferr)
-    call h5close_f(self%hdferr)
+    integer :: err_local
+    self%hdferr = 0
+    if (self%file_id < 0_hid_t) then
+      self%hdferr = -1
+    else
+      call h5fclose_f(self%file_id, self%hdferr)
+      if (self%hdferr == 0) self%file_id = -1_hid_t
+    end if
+    call h5close_f(err_local)
+    if (self%hdferr == 0) self%hdferr = err_local
   end subroutine h5fort_serial_close
 
   !============================================================================
@@ -678,6 +708,35 @@ contains
     integer(int32),        intent(out) :: array(:, :, :, :)
     call h5fort_read_i32_4d_fixed(self%file_id, dset_path, array, self%hdferr)
   end subroutine h5fort_serial_read_i32_4d_fixed
+
+
+  subroutine h5fort_serial_read_lgc_1d_fixed(self, dset_path, array)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*), intent(in)  :: dset_path
+    logical,          intent(out) :: array(:)
+    call h5fort_read_lgc_1d_fixed(self%file_id, dset_path, array, self%hdferr)
+  end subroutine h5fort_serial_read_lgc_1d_fixed
+
+  subroutine h5fort_serial_read_lgc_2d_fixed(self, dset_path, array)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*), intent(in)  :: dset_path
+    logical,          intent(out) :: array(:, :)
+    call h5fort_read_lgc_2d_fixed(self%file_id, dset_path, array, self%hdferr)
+  end subroutine h5fort_serial_read_lgc_2d_fixed
+
+  subroutine h5fort_serial_read_lgc_3d_fixed(self, dset_path, array)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*), intent(in)  :: dset_path
+    logical,          intent(out) :: array(:, :, :)
+    call h5fort_read_lgc_3d_fixed(self%file_id, dset_path, array, self%hdferr)
+  end subroutine h5fort_serial_read_lgc_3d_fixed
+
+  subroutine h5fort_serial_read_lgc_4d_fixed(self, dset_path, array)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*), intent(in)  :: dset_path
+    logical,          intent(out) :: array(:, :, :, :)
+    call h5fort_read_lgc_4d_fixed(self%file_id, dset_path, array, self%hdferr)
+  end subroutine h5fort_serial_read_lgc_4d_fixed
 
 
 end module h5fort_serial

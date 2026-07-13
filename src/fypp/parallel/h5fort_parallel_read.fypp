@@ -1,5 +1,5 @@
 ! DO NOT EDIT — generated from src/fypp/parallel/h5fort_parallel_read.fypp
-! To regenerate: scripts/generate_fypp.sh
+! To regenerate: src/fypp/generate_fypp.sh
 #:include "common.fypp"
 #:set H5T_KIND = {'r64': 'H5T_NATIVE_DOUBLE', 'r32': 'H5T_NATIVE_REAL'}
 #include "h5fort_config.inc"

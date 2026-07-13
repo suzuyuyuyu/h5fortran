@@ -1,5 +1,6 @@
 ! DO NOT EDIT — generated from src/fypp/parallel/h5fort_parallel_read.fypp
-! To regenerate: scripts/generate_fypp.sh
+! To regenerate: src/fypp/generate_fypp.sh
+
 #include "h5fort_config.inc"
 #include "h5fort_parallel.inc"
 module h5fort_parallel_read

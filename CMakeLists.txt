@@ -5,36 +5,42 @@ project(h5fortran
   LANGUAGES Fortran)
 
 include(CTest)
+include(GNUInstallDirs)
+
+option(H5FORTRAN_ENABLE_SERIAL "Build the serial API" ON)
+option(H5FORTRAN_ENABLE_PARALLEL "Build the parallel MPI API" ON)
+
+if(NOT H5FORTRAN_ENABLE_SERIAL AND NOT H5FORTRAN_ENABLE_PARALLEL)
+  message(FATAL_ERROR "At least one of H5FORTRAN_ENABLE_SERIAL or H5FORTRAN_ENABLE_PARALLEL must be ON")
+endif()
 
 set(CMAKE_Fortran_MODULE_DIRECTORY "${CMAKE_BINARY_DIR}/mod")
 file(MAKE_DIRECTORY "${CMAKE_Fortran_MODULE_DIRECTORY}")
 
-set(H5FORTRAN_HDF5_ROOT "$ENV{HOME}/.local/opt/intel/phdf5" CACHE PATH
-  "(Parallel) HDF5 installation prefix")
-
-set(HDF5_ROOT "${H5FORTRAN_HDF5_ROOT}")
-set(HDF5_PREFER_PARALLEL ON)
+if(H5FORTRAN_ENABLE_PARALLEL)
+  set(HDF5_PREFER_PARALLEL ON)
+endif()
 find_package(HDF5 REQUIRED COMPONENTS Fortran HL)
 
-file(STRINGS "${H5FORTRAN_HDF5_ROOT}/include/H5pubconf.h" _h5_parallel
-  REGEX "^#define H5_HAVE_PARALLEL 1")
-if(NOT _h5_parallel)
-  message(FATAL_ERROR "HDF5 at ${H5FORTRAN_HDF5_ROOT} is not parallel (H5_HAVE_PARALLEL not set)")
+if(H5FORTRAN_ENABLE_PARALLEL)
+  find_package(MPI REQUIRED COMPONENTS Fortran)
+  if(DEFINED HDF5_IS_PARALLEL AND NOT HDF5_IS_PARALLEL)
+    message(FATAL_ERROR "The parallel API requires an HDF5 build with parallel I/O support")
+  endif()
 endif()
-message(STATUS "HDF5 parallel: yes (${H5FORTRAN_HDF5_ROOT})")
 
 add_library(h5fortran_hdf5 INTERFACE)
-target_include_directories(h5fortran_hdf5 INTERFACE ${HDF5_INCLUDE_DIRS})
 target_link_libraries(h5fortran_hdf5 INTERFACE
-  ${HDF5_Fortran_HL_LIBRARIES}
-  ${HDF5_Fortran_LIBRARIES}
-  ${HDF5_LIBRARIES})
-target_link_options(h5fortran_hdf5 INTERFACE
-  "-Wl,-rpath,${H5FORTRAN_HDF5_ROOT}/lib")
+  hdf5::hdf5_fortran
+  hdf5::hdf5_hl_fortran)
 
 add_subdirectory(src)
 
-install(FILES "${CMAKE_SOURCE_DIR}/cmake/h5fortranConfig.cmake"
+configure_file(
+  "${CMAKE_SOURCE_DIR}/cmake/h5fortranConfig.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/h5fortranConfig.cmake"
+  @ONLY)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/h5fortranConfig.cmake"
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/h5fortran")
 
 if(BUILD_TESTING)

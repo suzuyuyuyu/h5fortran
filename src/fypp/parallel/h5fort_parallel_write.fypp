@@ -1,5 +1,5 @@
 ! DO NOT EDIT — generated from src/fypp/parallel/h5fort_parallel_write.fypp
-! To regenerate: scripts/generate_fypp.sh
+! To regenerate: src/fypp/generate_fypp.sh
 #:include "common.fypp"
 #:set RANK_NX = {1: [], 2: ['ncomp'], 3: ['n1', 'n2'], 4: ['n1', 'n2', 'n3']}
 #include "h5fort_config.inc"
@@ -21,6 +21,22 @@ module h5fort_parallel_write
   character(len=*), parameter :: OFFSET_DATASET_NAME = H5FORT_DSET_OFFSET_DNAME
 
 contains
+
+  subroutine validate_nonpartition_dims(dims, hdferr)
+    integer(int64), intent(in) :: dims(:)
+    integer, intent(out) :: hdferr
+    integer(int64) :: min_dims(size(dims)), max_dims(size(dims))
+    integer :: mpi_err
+
+    hdferr = 0
+    call MPI_Allreduce(dims, min_dims, size(dims), MPI_INTEGER8, MPI_MIN, MPI_COMM_WORLD, mpi_err)
+    if (mpi_err /= MPI_SUCCESS) then
+      hdferr = -1
+      return
+    end if
+    call MPI_Allreduce(dims, max_dims, size(dims), MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mpi_err)
+    if (mpi_err /= MPI_SUCCESS .or. any(min_dims /= max_dims)) hdferr = -1
+  end subroutine validate_nonpartition_dims
 
   subroutine begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
     integer(hid_t), intent(in) :: file_id
@@ -221,6 +237,9 @@ contains
     #:for nx in RANK_NX[rank]
     integer(int64) :: ${nx}$
     #:endfor
+    #:if rank > 1
+    integer(int64) :: nonpartition_dims(${rank - 1}$)
+    #:endif
     integer(int64) :: nlocal, ntotal, local_offset
     integer(hid_t) :: group_id, xfer_id
     #:if kname == 'i32'
@@ -230,6 +249,15 @@ contains
     #:for i, nx in enumerate(RANK_NX[rank])
     ${nx}$ = int(size(array, ${i + 1}$), int64)
     #:endfor
+    #:if rank > 1
+    nonpartition_dims = [${', '.join(RANK_NX[rank])}$]
+    call validate_nonpartition_dims(nonpartition_dims, hdferr)
+    if (hdferr /= 0) then
+      write(error_unit, '(a,a)') "[h5fort/parallel/write] ERROR: non-partition dimensions differ between ranks: ", &
+        trim(dset_path)
+      return
+    end if
+    #:endif
     nlocal = int(size(array, ${rank}$), int64)
     call begin_parallel_write(file_id, dset_path, nlocal, group_id, xfer_id, count_, offset_, ntotal, local_offset, hdferr)
     if (hdferr /= 0) return

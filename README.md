@@ -1,58 +1,50 @@
-<h1 align='center'> h5fortran </h1>
+<h1 align="center">h5fortran</h1>
 
-*h5fortran* is a Fortran library for reading and writing HDF5 files.
-It provides a simple and efficient interface for working with HDF5 files in Fortran, supporting both Serial and Parallel HDF5.
+Serial / Parallel HDF5 を Fortran から簡潔に扱うためのラッパーです。手続き API と、ファイル ID・エラー状態を保持する OOP API を提供します。
 
-## Requirements
+## 必要なもの
 
-- Intel Fortran (`ifx` / `mpiifx`)
-- Parallel HDF5 with Fortran support (default path: `$HOME/.local/opt/intel/phdf5`, configurable via `H5FORTRAN_HDF5_ROOT`)
+- Fortran 2008 対応コンパイラ
+- HDF5（Fortran / HL component）
+- Parallel API を使う場合は Parallel HDF5 と MPI Fortran
+- 生成ソースを更新する場合は fypp 3.2
 
-## Build & Install
+## Build
 
-```bash
-cmake --preset intel-mpi -DCMAKE_INSTALL_PREFIX=$HOME/.local
-cmake --build build/intel-mpi
-cmake --install build/intel-mpi
+HDF5 は通常の `find_package(HDF5)` で探索します。非標準 prefix は `HDF5_ROOT` で指定してください。
+
+```sh
+cmake -S . -B build -DHDF5_ROOT=/path/to/hdf5
+cmake --build build
+ctest --test-dir build --output-on-failure
+cmake --install build --prefix "$HOME/.local"
 ```
 
-## Quickstart
+Serial / Parallel は個別に選択できます（既定は両方 `ON`）。
 
-```fortran
-program example
-  use hdf5
-  use h5fort
-  use iso_fortran_env, only: real64
-  implicit none
-
-  integer :: hdferr
-  integer(hid_t) :: file_id
-  real(real64) :: data(100)
-  real(real64), allocatable :: data_read(:)
-
-  data = 1.0_real64
-
-  call h5open_f(hdferr)
-
-  call h5fcreate_f("out.h5", H5F_ACC_TRUNC_F, file_id, hdferr)
-  call h5fort_swrite(file_id, "/data", data, hdferr)
-  call h5fclose_f(file_id, hdferr)
-
-  call h5fopen_f("out.h5", H5F_ACC_RDONLY_F, file_id, hdferr)
-  call h5fort_sread(file_id, "/data", data_read, hdferr)
-  call h5fclose_f(file_id, hdferr)
-
-  call h5close_f(hdferr)
-end program
+```sh
+# Serial のみ。MPI と Parallel HDF5 は不要
+cmake -S . -B build-serial \
+  -DH5FORTRAN_ENABLE_SERIAL=ON \
+  -DH5FORTRAN_ENABLE_PARALLEL=OFF
 ```
 
-## Downstream CMake Integration
-
-After installing, downstream projects can link h5fortran via `find_package`:
+インストール後は次の target を利用します。
 
 ```cmake
-find_package(h5fortran REQUIRED)
-target_link_libraries(my_target PRIVATE h5fortran::h5fortran)
+find_package(h5fortran CONFIG REQUIRED)
+target_link_libraries(my_program PRIVATE h5fortran::h5fortran)
 ```
 
-For details on the full API, see [docs/USAGE.md](docs/USAGE.md).
+最短の利用例は [Serial example](example/small-serial.F90) と [Parallel example](example/small-parallel.F90)、API の詳細は [docs/USAGE.md](docs/USAGE.md) を参照してください。
+
+## fypp 生成
+
+型・rank 別の Fortran ソースは `src/fypp/` を正とします。
+
+```sh
+src/fypp/generate_fypp.sh
+src/fypp/generate_fypp.sh --check
+```
+
+`FYPP=/path/to/fypp` で実行ファイルを上書きできます。CI 相当の同期確認は CTest の `generated_sources` でも実行されます。

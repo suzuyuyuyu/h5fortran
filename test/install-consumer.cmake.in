@@ -1,0 +1,27 @@
+set(stage "@CMAKE_CURRENT_BINARY_DIR@/install-stage")
+set(consumer_build "@CMAKE_CURRENT_BINARY_DIR@/consumer-build")
+
+execute_process(
+  COMMAND "@CMAKE_COMMAND@" --install "@CMAKE_BINARY_DIR@" --prefix "${stage}"
+  RESULT_VARIABLE result)
+if(NOT result EQUAL 0)
+  message(FATAL_ERROR "h5fortran install failed")
+endif()
+
+set(configure_command
+  "@CMAKE_COMMAND@" -S "@CMAKE_CURRENT_BINARY_DIR@/consumer" -B "${consumer_build}"
+  "-DCMAKE_Fortran_COMPILER=@CMAKE_Fortran_COMPILER@"
+  "-Dh5fortran_DIR=${stage}/@CMAKE_INSTALL_LIBDIR@/cmake/h5fortran")
+if(NOT "@HDF5_ROOT@" STREQUAL "")
+  list(APPEND configure_command "-DHDF5_ROOT=@HDF5_ROOT@")
+endif()
+execute_process(COMMAND ${configure_command} RESULT_VARIABLE result)
+if(NOT result EQUAL 0)
+  message(FATAL_ERROR "consumer configure failed")
+endif()
+execute_process(
+  COMMAND "@CMAKE_COMMAND@" --build "${consumer_build}"
+  RESULT_VARIABLE result)
+if(NOT result EQUAL 0)
+  message(FATAL_ERROR "consumer build failed")
+endif()
