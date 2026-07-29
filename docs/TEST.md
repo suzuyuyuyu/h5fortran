@@ -13,6 +13,8 @@ ctest --test-dir build --output-on-failure
 - Serial: 不正 path、rank/shape 不一致、read-only write、未設定ファイル名、二重 open/close
 - Parallel（4 rank）: 1D/2D、real32、int32、logical、fixed read、0 要素の rank
 - Parallel: 非分割次元不一致の拒否、path/rank エラー、OOP read-only と状態エラー
+- Parallel metadata: `__partition__` の生成、旧metadataの不在、
+  `data`最終次元とpartition末尾の不一致検出
 - Visualization HDF5（2 rank）: scheme metadata、複数mesh group、geometry/connectivity、point/cell data
 - Visualization topology: Hexahedron、Tetrahedron、Quadrilateral、Triangle、Polyvertex
 - fypp 生成元と生成済みソースの同期

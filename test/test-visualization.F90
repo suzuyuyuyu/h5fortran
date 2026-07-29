@@ -1,4 +1,5 @@
 program test_visualization
+  use hdf5, only: h5open_f, h5close_f
   use h5fort
   use mpi
   use, intrinsic :: iso_fortran_env, only: int32, int64, real64
@@ -6,13 +7,15 @@ program test_visualization
 
   integer, parameter :: np = 8, nc = 1
   type(t_phdf5_writer) :: ugrid, tetra, quadrilateral, triangle, particles
-  integer :: ierr, me, i
+  integer :: ierr, hdferr, me, i
   real(real64) :: nodes(3, np), pressure(np), velocity(3, np)
   integer(int64) :: connectivity(8, nc)
   integer(int64) :: connectivity4(4, nc), connectivity3(3, nc)
   integer(int32) :: processor_id(nc)
 
   call MPI_Init(ierr)
+  call h5open_f(hdferr)
+  if (hdferr /= 0) call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
   call MPI_Comm_rank(MPI_COMM_WORLD, me, ierr)
   if (me == 0) call delete_if_exists("test-visualization.h5")
   call MPI_Barrier(MPI_COMM_WORLD, ierr)
@@ -88,6 +91,8 @@ program test_visualization
   call particles%write_point_data(pressure, "Pressure")
   call particles%close()
 
+  call h5close_f(hdferr)
+  if (hdferr /= 0) call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
   call MPI_Finalize(ierr)
 
 contains

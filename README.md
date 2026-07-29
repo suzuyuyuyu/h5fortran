@@ -36,7 +36,14 @@ find_package(h5fortran CONFIG REQUIRED)
 target_link_libraries(my_program PRIVATE h5fortran::h5fortran)
 ```
 
-最短の利用例は [Serial example](example/small-serial.F90) と [Parallel example](example/small-parallel.F90)、API の詳細は [docs/USAGE.md](docs/USAGE.md) を参照してください。
+手続きAPI、OOP API、可視化の利用例は [`example/`](example/) に用途別で配置して
+います。すべてまとめてビルドできます。
+
+```sh
+cmake --build build --target examples
+```
+
+APIの詳細は [docs/USAGE.md](docs/USAGE.md) を参照してください。
 
 可視化用HDF5のレイアウトと、HDF5時系列からXDMF3を生成するPythonツールは
 [docs/USAGE-visualization.md](docs/USAGE-visualization.md) と

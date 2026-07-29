@@ -16,20 +16,20 @@ module h5fort_parallel_read
   public :: h5fort_read_str_0d
   public :: h5fort_read_lgc_0d, h5fort_read_lgc_1d, h5fort_read_lgc_2d, h5fort_read_lgc_3d, h5fort_read_lgc_4d
 
-  character(len=*), parameter :: COUNT_DATASET_NAME  = H5FORT_DSET_COUNT_DNAME
-  character(len=*), parameter :: OFFSET_DATASET_NAME = H5FORT_DSET_OFFSET_DNAME
+  character(len=*), parameter :: PARTITION_DATASET_NAME = H5FORT_DSET_PARTITION_DNAME
 
 contains
 
-  subroutine begin_parallel_read(file_id, dset_path, data_id, file_space_id, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+  subroutine begin_parallel_read(file_id, dset_path, data_id, file_space_id, xfer_id, nlocal, local_offset, hdferr)
     integer(hid_t), intent(in) :: file_id
     character(len=*), intent(in) :: dset_path
     integer(hid_t), intent(out) :: data_id, file_space_id, xfer_id
-    integer(int64), allocatable, intent(out) :: count_(:), offset_(:)
     integer(int64), intent(out) :: nlocal, local_offset
     integer, intent(out) :: hdferr
 
-    integer :: me, nprocs, mpi_err
+    integer(int64), allocatable :: partition_(:)
+    integer(hsize_t) :: dims(MAX_RANK), maxdims(MAX_RANK)
+    integer :: me, nprocs, rank, mpi_err
 
     data_id       = -1_hid_t
     file_space_id = -1_hid_t
@@ -43,23 +43,70 @@ contains
       return
     end if
 
-    allocate(count_(0:nprocs - 1), offset_(0:nprocs - 1))
-    call read_i64_vector(file_id, trim(dset_path)//"/"//trim(COUNT_DATASET_NAME),  count_,  hdferr)
+    allocate(partition_(0:nprocs))
+    call read_i64_vector(file_id, trim(dset_path)//"/"//trim(PARTITION_DATASET_NAME), partition_, hdferr)
     if (hdferr /= 0) return
-    call read_i64_vector(file_id, trim(dset_path)//"/"//trim(OFFSET_DATASET_NAME), offset_, hdferr)
-    if (hdferr /= 0) return
-
-    nlocal       = count_(me)
-    local_offset = offset_(me)
 
     call h5dopen_f(file_id, trim(dset_path)//"/data", data_id, hdferr)
     if (hdferr /= 0) return
     call h5dget_space_f(data_id, file_space_id, hdferr)
-    if (hdferr /= 0) return
+    if (hdferr /= 0) then
+      call cleanup_parallel_read_begin(data_id, file_space_id, xfer_id, hdferr)
+      return
+    end if
+    call h5sget_simple_extent_ndims_f(file_space_id, rank, hdferr)
+    if (hdferr == 0) then
+      if (rank >= 1) then
+        call h5sget_simple_extent_dims_f(file_space_id, dims(1:rank), maxdims(1:rank), hdferr)
+        if (hdferr >= 0) hdferr = 0
+      end if
+    end if
+    if (hdferr == 0) then
+      if (partition_(0) /= 0_int64 .or. &
+          any(partition_(1:) < partition_(:ubound(partition_, 1) - 1))) then
+        write(error_unit, '(a)') "[h5fort/parallel/read] ERROR: partition must start at zero and be nondecreasing"
+        hdferr = -1
+      else if (rank < 1) then
+        write(error_unit, '(a)') "[h5fort/parallel/read] ERROR: data must have rank >= 1"
+        hdferr = -1
+      else if (partition_(nprocs) /= int(dims(rank), int64)) then
+        write(error_unit, '(a)') "[h5fort/parallel/read] ERROR: data size and partition end differ"
+        hdferr = -1
+      end if
+    end if
+    if (hdferr /= 0) then
+      call cleanup_parallel_read_begin(data_id, file_space_id, xfer_id, hdferr)
+      return
+    end if
+
+    local_offset = partition_(me)
+    nlocal = partition_(me + 1) - partition_(me)
+
     call h5pcreate_f(H5P_DATASET_XFER_F, xfer_id, hdferr)
-    if (hdferr /= 0) return
-    call h5pset_dxpl_mpio_f(xfer_id, H5FD_MPIO_COLLECTIVE_F, hdferr)
+    if (hdferr == 0) call h5pset_dxpl_mpio_f(xfer_id, H5FD_MPIO_COLLECTIVE_F, hdferr)
+    if (hdferr /= 0) call cleanup_parallel_read_begin(data_id, file_space_id, xfer_id, hdferr)
   end subroutine begin_parallel_read
+
+  subroutine cleanup_parallel_read_begin(data_id, file_space_id, xfer_id, hdferr)
+    integer(hid_t), intent(inout) :: data_id, file_space_id, xfer_id
+    integer, intent(inout) :: hdferr
+    integer :: first_error, err_local
+
+    first_error = hdferr
+    if (xfer_id >= 0_hid_t) then
+      call h5pclose_f(xfer_id, err_local)
+      xfer_id = -1_hid_t
+    end if
+    if (file_space_id >= 0_hid_t) then
+      call h5sclose_f(file_space_id, err_local)
+      file_space_id = -1_hid_t
+    end if
+    if (data_id >= 0_hid_t) then
+      call h5dclose_f(data_id, err_local)
+      data_id = -1_hid_t
+    end if
+    hdferr = first_error
+  end subroutine cleanup_parallel_read_begin
 
   subroutine end_parallel_read(data_id, file_space_id, mem_space_id, xfer_id, hdferr)
     integer(hid_t), intent(in) :: data_id, file_space_id, mem_space_id, xfer_id
@@ -89,17 +136,36 @@ contains
     character(len=*), intent(in) :: dset_path
     integer(int64), intent(out) :: array(0:)
     integer, intent(out) :: hdferr
-    integer(hid_t) :: dset_id, h5t_i64
-    integer(hsize_t) :: dims(1)
-    integer :: err_local
+    integer(hid_t) :: dset_id, space_id, h5t_i64
+    integer(hsize_t) :: dims(1), file_dims(1), maxdims(1)
+    integer :: rank, err_local
 
+    dset_id = -1_hid_t
+    space_id = -1_hid_t
     dims(1) = int(size(array), hsize_t)
     h5t_i64 = h5kind_to_type(int64, H5_INTEGER_KIND)
     call h5dopen_f(file_id, trim(dset_path), dset_id, hdferr)
     if (hdferr /= 0) return
-    call h5dread_f(dset_id, h5t_i64, array, dims, hdferr)
-    call h5dclose_f(dset_id, err_local)
-    if (hdferr == 0) hdferr = err_local
+    call h5dget_space_f(dset_id, space_id, hdferr)
+    if (hdferr == 0) call h5sget_simple_extent_ndims_f(space_id, rank, hdferr)
+    if (hdferr == 0) then
+      if (rank == 1) then
+        call h5sget_simple_extent_dims_f(space_id, file_dims, maxdims, hdferr)
+        if (hdferr >= 0) hdferr = 0
+      end if
+    end if
+    if (hdferr == 0) then
+      if (rank /= 1 .or. file_dims(1) /= dims(1)) hdferr = -1
+    end if
+    if (hdferr == 0) call h5dread_f(dset_id, h5t_i64, array, dims, hdferr)
+    if (space_id >= 0_hid_t) then
+      call h5sclose_f(space_id, err_local)
+      if (hdferr == 0) hdferr = err_local
+    end if
+    if (dset_id >= 0_hid_t) then
+      call h5dclose_f(dset_id, err_local)
+      if (hdferr == 0) hdferr = err_local
+    end if
   end subroutine read_i64_vector
 
   subroutine get_data_rank_dims(data_id, rank, dims, hdferr)
@@ -187,11 +253,11 @@ contains
     real(real64), allocatable, intent(out) :: array(:)
     integer, intent(out) :: hdferr
     integer(hid_t) :: data_id, fsid, msid, xfer_id
-    integer(int64), allocatable :: count_(:), offset_(:)
     integer(int64) :: nlocal, local_offset
     integer(hsize_t) :: dims_m(1)
 
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    msid = -1_hid_t
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, nlocal, local_offset, hdferr)
     if (hdferr /= 0) return
     allocate(array(nlocal))
     call select_1d_slab(fsid, nlocal, local_offset, dims_m, msid, hdferr)
@@ -206,11 +272,11 @@ contains
     real(real32), allocatable, intent(out) :: array(:)
     integer, intent(out) :: hdferr
     integer(hid_t) :: data_id, fsid, msid, xfer_id
-    integer(int64), allocatable :: count_(:), offset_(:)
     integer(int64) :: nlocal, local_offset
     integer(hsize_t) :: dims_m(1)
 
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    msid = -1_hid_t
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, nlocal, local_offset, hdferr)
     if (hdferr /= 0) return
     allocate(array(nlocal))
     call select_1d_slab(fsid, nlocal, local_offset, dims_m, msid, hdferr)
@@ -226,12 +292,12 @@ contains
     integer, intent(out) :: hdferr
     integer(hid_t) :: data_id, fsid, msid, xfer_id
     integer(hid_t) :: h5t_i32
-    integer(int64), allocatable :: count_(:), offset_(:)
     integer(int64) :: nlocal, local_offset
     integer(hsize_t) :: dims_m(1)
 
     h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    msid = -1_hid_t
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, nlocal, local_offset, hdferr)
     if (hdferr /= 0) return
     allocate(array(nlocal))
     call select_1d_slab(fsid, nlocal, local_offset, dims_m, msid, hdferr)
@@ -249,12 +315,12 @@ contains
     real(real64), allocatable, intent(out) :: array(:, :)
     integer, intent(out) :: hdferr
     integer(hid_t) :: data_id, fsid, msid, xfer_id
-    integer(int64), allocatable :: count_(:), offset_(:)
     integer(int64) :: nlocal, local_offset
     integer :: rank_
     integer(hsize_t) :: dims(MAX_RANK), dims_m(2)
 
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    msid = -1_hid_t
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, nlocal, local_offset, hdferr)
     if (hdferr /= 0) return
     call get_data_rank_dims(data_id, rank_, dims, hdferr)
     if (hdferr == 0 .and. rank_ /= 2) hdferr = -1
@@ -271,12 +337,12 @@ contains
     real(real64), allocatable, intent(out) :: array(:, :, :)
     integer, intent(out) :: hdferr
     integer(hid_t) :: data_id, fsid, msid, xfer_id
-    integer(int64), allocatable :: count_(:), offset_(:)
     integer(int64) :: nlocal, local_offset
     integer :: rank_
     integer(hsize_t) :: dims(MAX_RANK), dims_m(3)
 
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    msid = -1_hid_t
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, nlocal, local_offset, hdferr)
     if (hdferr /= 0) return
     call get_data_rank_dims(data_id, rank_, dims, hdferr)
     if (hdferr == 0 .and. rank_ /= 3) hdferr = -1
@@ -293,12 +359,12 @@ contains
     real(real64), allocatable, intent(out) :: array(:, :, :, :)
     integer, intent(out) :: hdferr
     integer(hid_t) :: data_id, fsid, msid, xfer_id
-    integer(int64), allocatable :: count_(:), offset_(:)
     integer(int64) :: nlocal, local_offset
     integer :: rank_
     integer(hsize_t) :: dims(MAX_RANK), dims_m(4)
 
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    msid = -1_hid_t
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, nlocal, local_offset, hdferr)
     if (hdferr /= 0) return
     call get_data_rank_dims(data_id, rank_, dims, hdferr)
     if (hdferr == 0 .and. rank_ /= 4) hdferr = -1
@@ -315,12 +381,12 @@ contains
     real(real32), allocatable, intent(out) :: array(:, :)
     integer, intent(out) :: hdferr
     integer(hid_t) :: data_id, fsid, msid, xfer_id
-    integer(int64), allocatable :: count_(:), offset_(:)
     integer(int64) :: nlocal, local_offset
     integer :: rank_
     integer(hsize_t) :: dims(MAX_RANK), dims_m(2)
 
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    msid = -1_hid_t
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, nlocal, local_offset, hdferr)
     if (hdferr /= 0) return
     call get_data_rank_dims(data_id, rank_, dims, hdferr)
     if (hdferr == 0 .and. rank_ /= 2) hdferr = -1
@@ -337,12 +403,12 @@ contains
     real(real32), allocatable, intent(out) :: array(:, :, :)
     integer, intent(out) :: hdferr
     integer(hid_t) :: data_id, fsid, msid, xfer_id
-    integer(int64), allocatable :: count_(:), offset_(:)
     integer(int64) :: nlocal, local_offset
     integer :: rank_
     integer(hsize_t) :: dims(MAX_RANK), dims_m(3)
 
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    msid = -1_hid_t
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, nlocal, local_offset, hdferr)
     if (hdferr /= 0) return
     call get_data_rank_dims(data_id, rank_, dims, hdferr)
     if (hdferr == 0 .and. rank_ /= 3) hdferr = -1
@@ -359,12 +425,12 @@ contains
     real(real32), allocatable, intent(out) :: array(:, :, :, :)
     integer, intent(out) :: hdferr
     integer(hid_t) :: data_id, fsid, msid, xfer_id
-    integer(int64), allocatable :: count_(:), offset_(:)
     integer(int64) :: nlocal, local_offset
     integer :: rank_
     integer(hsize_t) :: dims(MAX_RANK), dims_m(4)
 
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    msid = -1_hid_t
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, nlocal, local_offset, hdferr)
     if (hdferr /= 0) return
     call get_data_rank_dims(data_id, rank_, dims, hdferr)
     if (hdferr == 0 .and. rank_ /= 4) hdferr = -1
@@ -382,13 +448,13 @@ contains
     integer, intent(out) :: hdferr
     integer(hid_t) :: data_id, fsid, msid, xfer_id
     integer(hid_t) :: h5t_i32
-    integer(int64), allocatable :: count_(:), offset_(:)
     integer(int64) :: nlocal, local_offset
     integer :: rank_
     integer(hsize_t) :: dims(MAX_RANK), dims_m(2)
 
     h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    msid = -1_hid_t
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, nlocal, local_offset, hdferr)
     if (hdferr /= 0) return
     call get_data_rank_dims(data_id, rank_, dims, hdferr)
     if (hdferr == 0 .and. rank_ /= 2) hdferr = -1
@@ -405,13 +471,13 @@ contains
     integer, intent(out) :: hdferr
     integer(hid_t) :: data_id, fsid, msid, xfer_id
     integer(hid_t) :: h5t_i32
-    integer(int64), allocatable :: count_(:), offset_(:)
     integer(int64) :: nlocal, local_offset
     integer :: rank_
     integer(hsize_t) :: dims(MAX_RANK), dims_m(3)
 
     h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    msid = -1_hid_t
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, nlocal, local_offset, hdferr)
     if (hdferr /= 0) return
     call get_data_rank_dims(data_id, rank_, dims, hdferr)
     if (hdferr == 0 .and. rank_ /= 3) hdferr = -1
@@ -428,13 +494,13 @@ contains
     integer, intent(out) :: hdferr
     integer(hid_t) :: data_id, fsid, msid, xfer_id
     integer(hid_t) :: h5t_i32
-    integer(int64), allocatable :: count_(:), offset_(:)
     integer(int64) :: nlocal, local_offset
     integer :: rank_
     integer(hsize_t) :: dims(MAX_RANK), dims_m(4)
 
     h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, count_, offset_, nlocal, local_offset, hdferr)
+    msid = -1_hid_t
+    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, nlocal, local_offset, hdferr)
     if (hdferr /= 0) return
     call get_data_rank_dims(data_id, rank_, dims, hdferr)
     if (hdferr == 0 .and. rank_ /= 4) hdferr = -1

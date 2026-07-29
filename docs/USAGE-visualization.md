@@ -22,15 +22,21 @@ result/
 ## HDF5出力
 
 ```fortran
+use hdf5, only: h5open_f, h5close_f
 use h5fort
 use mpi
 use iso_fortran_env, only: int64, real64
 
 type(t_phdf5_writer) :: writer
+integer :: ierr, hdferr
 real(real64) :: nodes(3, num_points)
 integer(int64) :: connectivity(8, num_cells)
 real(real64) :: pressure(num_points)
 real(real64) :: velocity(3, num_points)
+
+call MPI_Init(ierr)
+call h5open_f(hdferr)
+if (hdferr /= 0) call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
 
 writer%h5_filepath = 'result/seq000000.h5'
 writer%output_type = 'UnstructuredGrid'
@@ -43,6 +49,10 @@ call writer%write_geometry_ugrid(nodes, connectivity)
 call writer%write_point_data(pressure, 'Pressure')
 call writer%write_point_data(velocity, 'Velocity')
 call writer%close()
+
+call h5close_f(hdferr)
+if (hdferr /= 0) call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
+call MPI_Finalize(ierr)
 ```
 
 `num_cells` は各rankが出力するowned cell数で、ghost cellは含めません。
@@ -53,6 +63,11 @@ connectivityは `nodes(:, :)` を参照するrank-local 0-origin node IDで渡�
 writerがrankごとのnode offsetを加え、HDF5全体のIDへ変換します。呼び出し側で
 global node IDを計算するための通信は不要です。`init`、write、`close` は全rankが
 同じ順序で呼びます。
+
+writerはHDF5ライブラリ自体の開始・終了を行いません。全rankがプログラム全体で
+`MPI_Init` → `h5open_f` → writer処理 → `h5close_f` → `MPI_Finalize` の順に
+呼びます。複数stepや複数meshを書いても、`h5open_f` / `h5close_f` はそれぞれ
+1回だけです。
 
 ```fortran
 ! nodes(:, 1:4) を参照するrank-local connectivity

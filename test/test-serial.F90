@@ -20,6 +20,8 @@ program test_serial
   character(len=:), allocatable :: got_text
   character(len=:), allocatable :: got_attr
 
+  call h5open_f(hdferr); call check(hdferr, "HDF5 initialization")
+
   call invalid%open()
   call assert(invalid%hdferr /= 0, "open without f_name must fail")
 
@@ -101,6 +103,7 @@ program test_serial
 
   call file%close(); call check(file%hdferr, "close after read")
   call file%close(); call assert(file%hdferr /= 0, "double close must fail")
+  call h5close_f(hdferr); call check(hdferr, "HDF5 finalization")
 
 contains
 

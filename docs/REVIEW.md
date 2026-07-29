@@ -8,7 +8,7 @@
 - `src/serial/`, `src/parallel/`: fyppで生成されたビルド対象Fortran
 - `src/h5fort.F90`: Serial/Parallel公開APIのfacade
 - `test/`: Serial、Parallel、Visualization HDF5、install consumerのテスト
-- `example/`: Serial、Parallel、可視化出力の利用例
+- `example/`: Serial/Parallelの手続き・OOP APIと可視化出力の独立した利用例
 - `postprocess/`: snapshot HDF5の索引化とXDMF3生成を行うPython package
 - `docs/`: API、可視化schema、ポストプロセス、テスト、TODO
 

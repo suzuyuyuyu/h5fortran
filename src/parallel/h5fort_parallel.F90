@@ -228,9 +228,6 @@ contains
     mode_ = 0
     if (present(mode)) mode_ = mode
 
-    call h5open_f(self%hdferr)
-    if (self%hdferr /= 0) return
-
     call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, self%hdferr)
     if (self%hdferr /= 0) return
     call h5pset_fapl_mpio_f(fapl_id, MPI_COMM_WORLD, MPI_INFO_NULL, self%hdferr)
@@ -255,7 +252,6 @@ contains
   !============================================================================
   subroutine h5fort_parallel_close(self)
     class(t_h5fort_parallel), intent(inout) :: self
-    integer :: err_local
     self%hdferr = 0
     if (self%file_id < 0_hid_t) then
       self%hdferr = -1
@@ -263,8 +259,6 @@ contains
       call h5fclose_f(self%file_id, self%hdferr)
       if (self%hdferr == 0) self%file_id = -1_hid_t
     end if
-    call h5close_f(err_local)
-    if (self%hdferr == 0) self%hdferr = err_local
   end subroutine h5fort_parallel_close
 
   !============================================================================

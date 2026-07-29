@@ -1,4 +1,5 @@
 program write_visualization_results
+  use hdf5, only: h5open_f, h5close_f
   use h5fort
   use mpi
   use, intrinsic :: iso_fortran_env, only: int32, int64, real64
@@ -13,7 +14,7 @@ program write_visualization_results
   real(real64), parameter :: pi = acos(-1.0_real64)
 
   type(t_phdf5_writer) :: fluid, soil
-  integer :: ierr, me, nprocs, step, i, ix, iy, iz, cell, num_soil_particles
+  integer :: ierr, hdferr, me, nprocs, step, i, ix, iy, iz, cell, num_soil_particles
   integer :: vertices(8), tetrahedra(4, 6)
   character(len=256) :: filename
   real(real64) :: time, x, y, z, x0, y0, z0, xc, yc, radius, phase
@@ -26,6 +27,8 @@ program write_visualization_results
   integer(int64), allocatable :: particle_id(:)
 
   call MPI_Init(ierr)
+  call h5open_f(hdferr)
+  if (hdferr /= 0) call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
   call MPI_Comm_rank(MPI_COMM_WORLD, me, ierr)
   call MPI_Comm_size(MPI_COMM_WORLD, nprocs, ierr)
 
@@ -117,6 +120,8 @@ program write_visualization_results
     deallocate(particle_nodes, particle_velocity, particle_stress, particle_id)
   end do
 
+  call h5close_f(hdferr)
+  if (hdferr /= 0) call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
   call MPI_Finalize(ierr)
 
 contains

@@ -216,12 +216,6 @@ contains
 #   undef ABORT
     is_file_initialized = .true.
 
-    call h5open_f(hdferr)
-    if (hdferr /= 0) then
-      write(error_unit,'(a)') 'ERROR phdf5_init: h5open_f failed'
-      call MPI_Abort(self%comm, 1, mpi_err)
-    end if
-
     ! Set MPI rank and size
     call MPI_Comm_rank(self%comm, self%me, mpi_err)
     call MPI_Comm_size(self%comm, self%nprocs, mpi_err)

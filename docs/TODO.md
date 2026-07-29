@@ -8,6 +8,7 @@
       `metadata.h5` を構築する現在の方式を維持する。
     - `num_particles` は `metadata.h5` のmeshごとのentity数から取得できる。
     - 可視化以外の診断量を単一HDF5へ蓄積する明確な要求が生じた場合だけ検討する。
+- [?] serial のなかに `__partition__` と拡張可能データセット `data` のセットを出力し、parallel に読み込めるようなデータグループを書き出すためのサブルーチンを作成する
 
 ## h5xdmf (postprocess)
 - HDF5 schemaを明示的に検査する `h5xdmf validate`

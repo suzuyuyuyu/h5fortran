@@ -5,12 +5,17 @@
 通常は `t_h5fort_serial` を使うと、HDF5 の file ID と直前のエラーがオブジェクト内にまとまります。
 
 ```fortran
+use hdf5, only: h5open_f, h5close_f
 use h5fort
 use iso_fortran_env, only: real64
 
 type(t_h5fort_serial) :: file
+integer :: hdferr
 real(real64) :: values(3) = [1, 2, 3]
 real(real64), allocatable :: restored(:)
+
+call h5open_f(hdferr)
+if (hdferr /= 0) error stop "HDF5 initialization failed"
 
 file%f_name = "result.h5"
 call file%open(H5FORTRAN_FORCE_WRITE)
@@ -22,7 +27,14 @@ call file%open(H5FORTRAN_READ_ONLY)
 call file%read("/result/value", restored)
 if (file%hdferr /= 0) error stop "read failed"
 call file%close()
+
+call h5close_f(hdferr)
+if (hdferr /= 0) error stop "HDF5 finalization failed"
 ```
+
+`h5fortran` はHDF5ライブラリの開始・終了を行いません。利用者が処理全体で
+`h5open_f` と `h5close_f` をそれぞれ1回呼びます。`h5close_f` はすべての
+`t_h5fort_serial` ファイルを閉じた後に呼んでください。
 
 `open()` の mode は次のとおりです。
 
@@ -65,15 +77,20 @@ call h5fort_read_attribute(file_id, "/value", "units", units, hdferr)
 MPI 初期化後、全 rank が同じ順序で `open` / `write` / `read` / `close` を呼びます。配列の最終次元が rank 間で分割され、それ以外の次元は全 rank で一致している必要があります。
 
 ```fortran
+use hdf5, only: h5open_f, h5close_f
 use h5fort
 use mpi
 use iso_fortran_env, only: real64
 
 type(t_h5fort_parallel) :: file
+integer :: ierr, hdferr
 real(real64) :: local_values(10)
 real(real64), allocatable :: restored(:)
 
 call MPI_Init(ierr)
+call h5open_f(hdferr)
+if (hdferr /= 0) call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
+
 file%f_name = "parallel.h5"
 call file%open(H5FORTRAN_FORCE_WRITE)
 call file%write("/value", local_values)
@@ -82,8 +99,15 @@ call file%close()
 call file%open(H5FORTRAN_READ_ONLY)
 call file%read("/value", restored)
 call file%close()
+
+call h5close_f(hdferr)
+if (hdferr /= 0) call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
 call MPI_Finalize(ierr)
 ```
+
+Parallelでは全rankが `MPI_Init` の後に `h5open_f`、全HDF5ファイルを閉じた後かつ
+`MPI_Finalize` の前に `h5close_f` を呼びます。ファイルごとの `open` / `close` と
+HDF5ライブラリ全体の `h5open_f` / `h5close_f` は別のライフサイクルです。
 
 手続き API は `h5fort_pwrite`、`h5fort_pread`、`h5fort_pread_fixed` です。Parallel の文字列 I/O は現在未実装です。
 
@@ -93,9 +117,12 @@ call MPI_Finalize(ierr)
 
 ```text
 /value/data       全 rank のデータ
-/value/__count__  rank ごとの分割要素数
-/value/__offset__ rank ごとの開始位置
+/value/__partition__  rank境界（長さはMPI process数 + 1）
 ```
+
+例えば各rankの要素数が `[2, 3, 0, 4]` なら、`__partition__` は
+`[0, 2, 5, 5, 9]` です。rank `r` の開始位置は `partition(r)`、要素数は
+`partition(r+1) - partition(r)` です。
 
 詳細な型・rank とエラー契約は [SPEC.md](SPEC.md) を参照してください。
 

@@ -16,7 +16,7 @@ cmake --build "${build_dir}" --target example_visualization
 
 (
   cd "${example_dir}"
-  "${mpiexec_bin}" -n "${num_ranks}" "${build_dir}/test/example_visualization"
+  "${mpiexec_bin}" -n "${num_ranks}" "${build_dir}/example/example_visualization"
 )
 
 (

@@ -9,6 +9,7 @@ include(GNUInstallDirs)
 
 option(H5FORTRAN_ENABLE_SERIAL "Build the serial API" ON)
 option(H5FORTRAN_ENABLE_PARALLEL "Build the parallel MPI API" ON)
+option(H5FORTRAN_BUILD_EXAMPLES "Build the example programs" ON)
 
 if(NOT H5FORTRAN_ENABLE_SERIAL AND NOT H5FORTRAN_ENABLE_PARALLEL)
   message(FATAL_ERROR "At least one of H5FORTRAN_ENABLE_SERIAL or H5FORTRAN_ENABLE_PARALLEL must be ON")
@@ -36,8 +37,12 @@ target_link_libraries(h5fortran_hdf5 INTERFACE
 
 add_subdirectory(src)
 
+if(H5FORTRAN_BUILD_EXAMPLES)
+  add_subdirectory(example)
+endif()
+
 configure_file(
-  "${CMAKE_SOURCE_DIR}/cmake/h5fortranConfig.cmake.in"
+  "${PROJECT_SOURCE_DIR}/cmake/h5fortranConfig.cmake.in"
   "${CMAKE_CURRENT_BINARY_DIR}/h5fortranConfig.cmake"
   @ONLY)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/h5fortranConfig.cmake"

@@ -1,6 +1,6 @@
 debug/
 obj/
-build/
+**build**/
 /build-*/
 /install-*/
 include/

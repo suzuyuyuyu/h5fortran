@@ -1,7 +1,7 @@
 find_program(FYPP_EXECUTABLE fypp)
 if(FYPP_EXECUTABLE)
   add_test(NAME generated_sources
-    COMMAND "${CMAKE_SOURCE_DIR}/src/fypp/generate_fypp.sh" --check)
+    COMMAND "${PROJECT_SOURCE_DIR}/src/fypp/generate_fypp.sh" --check)
   set_tests_properties(generated_sources PROPERTIES
     ENVIRONMENT "FYPP=${FYPP_EXECUTABLE}")
 endif()
@@ -14,11 +14,6 @@ if(H5FORTRAN_ENABLE_SERIAL)
     Fortran_MODULE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/mod-serial")
   add_test(NAME serial COMMAND test_serial)
   set_tests_properties(serial PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
-
-  add_executable(example_serial "${CMAKE_SOURCE_DIR}/example/small-serial.F90")
-  target_link_libraries(example_serial PRIVATE h5fortran)
-  set_target_properties(example_serial PROPERTIES
-    Fortran_MODULE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/mod-example-serial")
 
   configure_file(consumer/CMakeLists.txt consumer/CMakeLists.txt COPYONLY)
   configure_file(consumer/main.F90 consumer/main.F90 COPYONLY)
@@ -34,17 +29,6 @@ if(H5FORTRAN_ENABLE_PARALLEL)
   set_target_properties(test_parallel PROPERTIES
     Fortran_PREPROCESS ON
     Fortran_MODULE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/mod-parallel")
-
-  add_executable(example_parallel "${CMAKE_SOURCE_DIR}/example/small-parallel.F90")
-  target_link_libraries(example_parallel PRIVATE h5fortran)
-  set_target_properties(example_parallel PROPERTIES
-    Fortran_MODULE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/mod-example-parallel")
-
-  add_executable(example_visualization
-    "${CMAKE_SOURCE_DIR}/example/visualization/write-results.F90")
-  target_link_libraries(example_visualization PRIVATE h5fortran)
-  set_target_properties(example_visualization PROPERTIES
-    Fortran_MODULE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/mod-example-visualization")
 
   if(MPIEXEC_EXECUTABLE)
     add_test(NAME parallel

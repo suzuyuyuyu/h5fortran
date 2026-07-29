@@ -25,6 +25,16 @@ Serial の文字列 attribute は dataset、group、root group を対象にで�
 
 未設定または空の `f_name`、二重 open、二重 close は失敗し、`hdferr` を非ゼロにする。
 
+## HDF5ライブラリのライフサイクル
+
+`h5fortran` のOOP APIと可視化writerは `h5open_f` / `h5close_f` を内部で呼ばない。
+利用者がHDF5処理全体の開始時に `h5open_f`、すべてのHDF5 objectを閉じた後に
+`h5close_f` を呼ぶ。
+
+Parallelでは全rankが `MPI_Init` 後に `h5open_f` を呼び、`h5close_f` を
+`MPI_Finalize` より前に呼ぶ。ファイル単位の `%open` / `%init` / `%close` は
+HDF5ライブラリ全体の開始・終了とは独立している。
+
 ## エラー契約
 
 公開手続きは成功時に `hdferr = 0`、失敗時に非ゼロを返す。一連の処理で複数の操作が失敗した場合は、最初の非ゼロ値を保持する。後続の resource close や属性書き込みの成功で先行エラーを消してはならない。
@@ -38,10 +48,17 @@ Parallel 配列は最終次元を MPI rank 間の分割方向とする。最終�
 path `P` の保存形式は次のとおりである。
 
 - `P/data`: 最終次元方向へ連結したデータ
-- `P/__count__`: rank ごとのローカル最終次元長
-- `P/__offset__`: rank ごとの `data` 内開始位置
+- `P/__partition__`: rank境界を表す長さ `writer_nprocs + 1` のint64配列
 
-`__count__` と `__offset__` の名前は `H5FORT_DSET_COUNT_DNAME` と `H5FORT_DSET_OFFSET_DNAME` で変更できる。
+`partition(0) = 0`、rank `r` の開始位置は `partition(r)`、ローカル最終次元長は
+`partition(r+1) - partition(r)`、全体長は `partition(writer_nprocs)` とする。
+値は単調非減少であり、ローカル長0も表現できる。
+
+write時とread時の両方で、`data` の最終次元長が `__partition__` の最終値と一致する
+ことを検査する。read時はさらに先頭0、単調非減少、partition長と現在のMPI process数
+の一致を検査し、不一致ならreadを開始せず `hdferr` を非ゼロにする。
+
+`__partition__` の名前は `H5FORT_DSET_PARTITION_DNAME` で変更できる。
 
 ## 生成物
 
