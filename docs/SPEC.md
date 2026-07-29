@@ -11,9 +11,11 @@
 | `integer(int32)` | yes | yes |
 | `logical` | yes | yes |
 | scalar `character` | yes | no |
-| 文字列属性・`units` | write | no |
+| 文字列属性・`units` | read / write | no |
 
 公開する手続き generic は Serial の `h5fort_swrite` / `h5fort_sread` / `h5fort_sread_fixed` と、Parallel の `h5fort_pwrite` / `h5fort_pread` / `h5fort_pread_fixed` である。対応する OOP type は `t_h5fort_serial` と `t_h5fort_parallel` である。
+
+Serial の文字列 attribute は dataset、group、root group を対象にできる。OOP API は `write_attribute` / `read_attribute`、手続き API は `h5fort_write_attribute` / `h5fort_read_attribute` とする。既存の複数 attribute 書き込み API `h5fort_swrite_attr` は互換性のため維持する。dataset の `write(..., attrs=..., units=...)` は同じ attribute 実装へ委譲する。
 
 ## ファイル mode
 
@@ -45,8 +47,37 @@ path `P` の保存形式は次のとおりである。
 
 `src/fypp/` の `.fypp` を生成元とし、`src/serial/` と `src/parallel/` の型・rank 展開済みソースは直接編集しない。fypp 3.2 を使用し、`src/fypp/generate_fypp.sh --check` で同期を検証する。
 
-## XDMF visualization writer
+## Visualization HDF5 writer
 
-`t_phdf5_writer` は従来の公開名と HDF5 group 構造を維持する。geometry は real32/real64/real128、connectivity は int8/int16/int32/int64、point/cell data はこれら7 kindの1D・2Dに対応する。XDMF attribute metadata は dataset write 時に型、precision、成分数から自動登録する。
+`t_phdf5_writer` はXDMF/XMLを生成せず、`scheme_version=1` のHDF5を出力する。
+root属性は `scheme_version` と `time`、mesh group属性は `topology_type` と
+`nodes_per_element`、vector/tensor dataset属性は `attribute_type` とする。
+geometry は real32/real64/real128、connectivity は int8/int16/int32/int64、
+point/cell data はこれら7 kindの1D・2Dに対応する。
 
-現在の dataset は固定サイズであり、`misc` の時系列追記に `H5S_UNLIMITED` を用いる将来形式とは別仕様とする。
+connectivityを持つmeshは `mesh_name`、XDMFの `topology_type`、
+`nodes_per_element` を指定することで一般化する。既定値は
+`ugrid`、`Hexahedron`、8とする。少なくとも `Tetrahedron`、
+`Quadrilateral`、`Triangle` を検証対象とする。
+
+各rankはowned cellだけを出力し、そのcellが参照する全local nodeを
+`nodes(:, :)` に含める。共有・halo nodeはrank間で重複してよい。connectivityは
+rank-local 0-origin IDとし、writerがrankごとのnode offsetを加えてHDF5全体のIDへ
+変換する。connectivityのlocal IDが `[0, num_points)` の範囲外なら失敗する。
+ghost cellは重複cellになるため出力しない。
+
+XDMF3は `postprocess` がHDF5 metadataを読み、ポストプロセスとして生成する。
+
+各snapshot内のdatasetは固定サイズとする。step間ではnode数、element数、粒子数が
+変化してよい。ソルバーは中央の `metadata.h5` へ追記せず、Python indexerが
+snapshot HDF5をmetadata-onlyで走査してmanifestを構築する。`metadata.h5` は
+snapshotから再構築可能な索引であり、Python側ではUNLIMITED datasetを使用して
+未登録stepを増分追記する。
+
+mesh名、topology、nodes per element、field構成、dtype、centeringは同じrunの
+時系列を通して固定する。time、node数、element数はstepごとに変化できる。
+MPI rankごとの範囲はHDF5内で連結済みの1つの論理meshとして扱い、
+`metadata.h5` では空間分割しない。同一mesh名の複数空間ブロックとAMRは
+scheme v1の対象外とする。
+
+詳細は [POSTPROCESS.md](POSTPROCESS.md) を参照する。

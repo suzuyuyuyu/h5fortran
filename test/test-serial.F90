@@ -18,6 +18,7 @@ program test_serial
   integer(int32), allocatable :: got_i32(:, :)
   logical, allocatable :: got_logical(:, :)
   character(len=:), allocatable :: got_text
+  character(len=:), allocatable :: got_attr
 
   call invalid%open()
   call assert(invalid%hdferr /= 0, "open without f_name must fail")
@@ -46,6 +47,10 @@ program test_serial
   call file%write("/types/text", "hello h5fortran"); call check(file%hdferr, "text")
   call file%write("/overwrite", 1_int32); call check(file%hdferr, "initial write")
   call file%write("/overwrite", 2_int32, mode=H5FORTRAN_FORCE_WRITE); call check(file%hdferr, "force overwrite")
+  call file%write_attribute("/rank/two", "description", "updated serial test")
+  call check(file%hdferr, "update dataset attribute")
+  call file%write_attribute("/rank", "description", "rank group")
+  call check(file%hdferr, "write group attribute")
   call file%close(); call check(file%hdferr, "close after write")
 
   call file%open(H5FORTRAN_READ_ONLY); call check(file%hdferr, "read-only open")
@@ -58,6 +63,12 @@ program test_serial
   call file%read("/types/logical", got_logical); call check(file%hdferr, "read logical")
   call file%read_fixed("/types/logical", logical_fixed); call check(file%hdferr, "fixed logical")
   call file%read("/types/text", got_text); call check(file%hdferr, "read text")
+  call file%read_attribute("/rank/two", "description", got_attr)
+  call check(file%hdferr, "read dataset attribute")
+  call assert(got_attr == "updated serial test", "dataset attribute value")
+  call h5fort_read_attribute(file%file_id, "/rank", "description", got_attr, hdferr)
+  call check(hdferr, "procedural read group attribute")
+  call assert(got_attr == "rank group", "group attribute value")
 
   call assert(all(got_1d == r64_1d), "rank 1 value")
   call assert(all(got_2d == r64_2d), "rank 2 value")

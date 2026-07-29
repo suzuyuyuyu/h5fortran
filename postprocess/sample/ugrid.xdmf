@@ -1,0 +1,120 @@
+<?xml version="1.0"?>
+<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd">
+<Xdmf Version="3.0">
+  <Domain>
+    <Grid Name="TimeSeries" GridType="Collection" CollectionType="Temporal">
+      <Grid Name="step00000" GridType="Uniform">
+        <Time Value="0.000000000000000E+00"/>
+        <Topology TopologyType="Hexahedron" NumberOfElements="64">
+          <DataItem Format="HDF" NumberType="Int" Precision="8" Dimensions="64 8">
+            phdf5/seq00000.h5:/ugrid/geometry/connectivity
+          </DataItem>
+        </Topology>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="125 3">
+            phdf5/seq00000.h5:/ugrid/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Pressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="125">
+            phdf5/seq00000.h5:/ugrid/point_data/Pressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="125 3">
+            phdf5/seq00000.h5:/ugrid/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="ProcessorID" AttributeType="Scalar" Center="Cell">
+          <DataItem Format="HDF" NumberType="Int" Precision="4" Dimensions="64">
+            phdf5/seq00000.h5:/ugrid/cell_data/ProcessorID
+          </DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="step00001" GridType="Uniform">
+        <Time Value="1.000000000000000E-05"/>
+        <Topology TopologyType="Hexahedron" NumberOfElements="125">
+          <DataItem Format="HDF" NumberType="Int" Precision="8" Dimensions="125 8">
+            phdf5/seq00001.h5:/ugrid/geometry/connectivity
+          </DataItem>
+        </Topology>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="216 3">
+            phdf5/seq00001.h5:/ugrid/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Pressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="216">
+            phdf5/seq00001.h5:/ugrid/point_data/Pressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="216 3">
+            phdf5/seq00001.h5:/ugrid/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="ProcessorID" AttributeType="Scalar" Center="Cell">
+          <DataItem Format="HDF" NumberType="Int" Precision="4" Dimensions="125">
+            phdf5/seq00001.h5:/ugrid/cell_data/ProcessorID
+          </DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="step00002" GridType="Uniform">
+        <Time Value="2.000000000000000E-05"/>
+        <Topology TopologyType="Hexahedron" NumberOfElements="216">
+          <DataItem Format="HDF" NumberType="Int" Precision="8" Dimensions="216 8">
+            phdf5/seq00002.h5:/ugrid/geometry/connectivity
+          </DataItem>
+        </Topology>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="343 3">
+            phdf5/seq00002.h5:/ugrid/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Pressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="343">
+            phdf5/seq00002.h5:/ugrid/point_data/Pressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="343 3">
+            phdf5/seq00002.h5:/ugrid/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="ProcessorID" AttributeType="Scalar" Center="Cell">
+          <DataItem Format="HDF" NumberType="Int" Precision="4" Dimensions="216">
+            phdf5/seq00002.h5:/ugrid/cell_data/ProcessorID
+          </DataItem>
+        </Attribute>
+      </Grid>
+      <Grid Name="step00003" GridType="Uniform">
+        <Time Value="3.000000000000000E-05"/>
+        <Topology TopologyType="Hexahedron" NumberOfElements="512">
+          <DataItem Format="HDF" NumberType="Int" Precision="8" Dimensions="512 8">
+            phdf5/seq00003.h5:/ugrid/geometry/connectivity
+          </DataItem>
+        </Topology>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="729 3">
+            phdf5/seq00003.h5:/ugrid/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Pressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="729">
+            phdf5/seq00003.h5:/ugrid/point_data/Pressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="729 3">
+            phdf5/seq00003.h5:/ugrid/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="ProcessorID" AttributeType="Scalar" Center="Cell">
+          <DataItem Format="HDF" NumberType="Int" Precision="4" Dimensions="512">
+            phdf5/seq00003.h5:/ugrid/cell_data/ProcessorID
+          </DataItem>
+        </Attribute>
+      </Grid>
+    </Grid>
+  </Domain>
+</Xdmf>

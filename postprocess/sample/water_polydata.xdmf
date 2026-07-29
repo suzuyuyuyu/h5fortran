@@ -1,0 +1,954 @@
+<?xml version="1.0"?>
+<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd">
+<Xdmf Version="3.0">
+  <Domain>
+    <Grid Name="TimeSeries" GridType="Collection" CollectionType="Temporal">
+
+      <Grid Name="seq00000" GridType="Uniform">
+        <Time Value=" 0.000000000000000E+00"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00000.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00000.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00000.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00000.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00000.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00000.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00000.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00000.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00001" GridType="Uniform">
+        <Time Value=" 1.000000000000000E-05"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00001.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00001.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00001.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00001.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00001.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00001.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00001.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00001.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00002" GridType="Uniform">
+        <Time Value=" 2.000000000000000E-05"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00002.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00002.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00002.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00002.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00002.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00002.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00002.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00002.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00003" GridType="Uniform">
+        <Time Value=" 3.000000000000000E-05"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00003.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00003.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00003.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00003.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00003.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00003.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00003.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00003.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00004" GridType="Uniform">
+        <Time Value=" 4.000000000000000E-05"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00004.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00004.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00004.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00004.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00004.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00004.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00004.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00004.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00005" GridType="Uniform">
+        <Time Value=" 5.000000000000000E-05"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00005.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00005.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00005.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00005.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00005.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00005.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00005.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00005.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00006" GridType="Uniform">
+        <Time Value=" 6.000000000000001E-05"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00006.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00006.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00006.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00006.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00006.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00006.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00006.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00006.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00007" GridType="Uniform">
+        <Time Value=" 7.000000000000001E-05"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00007.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00007.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00007.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00007.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00007.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00007.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00007.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00007.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00008" GridType="Uniform">
+        <Time Value=" 8.000000000000001E-05"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00008.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00008.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00008.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00008.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00008.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00008.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00008.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00008.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00009" GridType="Uniform">
+        <Time Value=" 9.000000000000001E-05"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00009.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00009.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00009.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00009.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00009.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00009.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00009.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00009.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00010" GridType="Uniform">
+        <Time Value=" 1.000000000000000E-04"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00010.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00010.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00010.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00010.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00010.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00010.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00010.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00010.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00011" GridType="Uniform">
+        <Time Value=" 1.100000000000000E-04"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00011.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00011.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00011.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00011.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00011.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00011.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00011.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00011.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00012" GridType="Uniform">
+        <Time Value=" 1.200000000000000E-04"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00012.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00012.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00012.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00012.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00012.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00012.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00012.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00012.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00013" GridType="Uniform">
+        <Time Value=" 1.300000000000000E-04"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00013.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00013.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00013.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00013.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00013.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00013.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00013.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00013.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00014" GridType="Uniform">
+        <Time Value=" 1.400000000000000E-04"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00014.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00014.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00014.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00014.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00014.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00014.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00014.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00014.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00015" GridType="Uniform">
+        <Time Value=" 1.500000000000000E-04"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00015.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00015.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00015.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00015.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00015.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00015.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00015.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00015.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00016" GridType="Uniform">
+        <Time Value=" 1.600000000000000E-04"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00016.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00016.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00016.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00016.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00016.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00016.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00016.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00016.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00017" GridType="Uniform">
+        <Time Value=" 1.700000000000000E-04"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00017.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00017.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00017.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00017.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00017.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00017.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00017.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00017.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00018" GridType="Uniform">
+        <Time Value=" 1.800000000000000E-04"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00018.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00018.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00018.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00018.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00018.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00018.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00018.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00018.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00019" GridType="Uniform">
+        <Time Value=" 1.900000000000000E-04"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00019.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00019.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00019.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00019.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00019.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00019.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00019.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00019.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+      <Grid Name="seq00020" GridType="Uniform">
+        <Time Value=" 2.000000000000000E-04"/>
+        <Topology TopologyType="Polyvertex" NumberOfElements="0" NodesPerElement="1"/>
+        <Geometry GeometryType="XYZ">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00020.h5:/polydata/geometry/nodes
+          </DataItem>
+        </Geometry>
+        <Attribute Name="Velocity" AttributeType="Vector" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 3">
+            ../phdf5/seq00020.h5:/polydata/point_data/Velocity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Stress" AttributeType="Tensor6" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 6">
+            ../phdf5/seq00020.h5:/polydata/point_data/Stress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="vonMisesStress" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00020.h5:/polydata/point_data/vonMisesStress
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Jacobian" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00020.h5:/polydata/point_data/Jacobian
+          </DataItem>
+        </Attribute>
+        <Attribute Name="Porosity" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00020.h5:/polydata/point_data/Porosity
+          </DataItem>
+        </Attribute>
+        <Attribute Name="HydrostaticPressure" AttributeType="Scalar" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0">
+            ../phdf5/seq00020.h5:/polydata/point_data/HydrostaticPressure
+          </DataItem>
+        </Attribute>
+        <Attribute Name="DeformationGradient" AttributeType="Tensor" Center="Node">
+          <DataItem Format="HDF" NumberType="Float" Precision="8" Dimensions="0 9">
+            ../phdf5/seq00020.h5:/polydata/point_data/DeformationGradient
+          </DataItem>
+        </Attribute>
+      </Grid>
+
+    </Grid>
+  </Domain>
+</Xdmf>

@@ -5,6 +5,7 @@ set(h5fortran_components h5fortran_hdf5)
 
 if(H5FORTRAN_ENABLE_SERIAL)
   add_library(h5fortran_serial
+    serial/h5fort_serial_attribute.F90
     serial/h5fort_serial_write.F90
     serial/h5fort_serial_read.F90
     serial/h5fort_serial_read_fixed.F90
@@ -26,7 +27,7 @@ if(H5FORTRAN_ENABLE_PARALLEL)
     parallel/h5fort_parallel_write.F90
     parallel/h5fort_parallel_read.F90
     parallel/h5fort_parallel_read_fixed.F90
-    parallel/h5fort_parallel_hdf5_xdmf.F90
+    parallel/h5fort_parallel_visualization.F90
     parallel/h5fort_parallel.F90)
   target_link_libraries(h5fortran_parallel PUBLIC h5fortran_hdf5 MPI::MPI_Fortran)
   target_include_directories(h5fortran_parallel

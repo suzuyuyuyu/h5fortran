@@ -30,6 +30,7 @@ module h5fort
 
 #ifdef H5FORTRAN_SERIAL
   public :: h5fort_swrite, h5fort_sread, h5fort_sread_fixed, h5fort_swrite_attr
+  public :: h5fort_write_attribute, h5fort_read_attribute
   public :: t_hdf5_attr, t_h5fort_serial
 #endif
 

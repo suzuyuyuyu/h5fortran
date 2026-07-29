@@ -40,17 +40,24 @@ if(H5FORTRAN_ENABLE_PARALLEL)
   set_target_properties(example_parallel PROPERTIES
     Fortran_MODULE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/mod-example-parallel")
 
+  add_executable(example_visualization
+    "${CMAKE_SOURCE_DIR}/example/visualization/write-results.F90")
+  target_link_libraries(example_visualization PRIVATE h5fortran)
+  set_target_properties(example_visualization PROPERTIES
+    Fortran_MODULE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/mod-example-visualization")
+
   if(MPIEXEC_EXECUTABLE)
     add_test(NAME parallel
       COMMAND "${MPIEXEC_EXECUTABLE}" "${MPIEXEC_NUMPROC_FLAG}" 4 $<TARGET_FILE:test_parallel>)
     set_tests_properties(parallel PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 
-    add_executable(test_xdmf test-xdmf.F90)
-    target_link_libraries(test_xdmf PRIVATE h5fortran)
-    set_target_properties(test_xdmf PROPERTIES
-      Fortran_MODULE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/mod-xdmf")
-    add_test(NAME xdmf
-      COMMAND "${MPIEXEC_EXECUTABLE}" "${MPIEXEC_NUMPROC_FLAG}" 2 $<TARGET_FILE:test_xdmf>)
-    set_tests_properties(xdmf PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+    add_executable(test_visualization test-visualization.F90)
+    target_link_libraries(test_visualization PRIVATE h5fortran)
+    set_target_properties(test_visualization PROPERTIES
+      Fortran_MODULE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/mod-visualization")
+    add_test(NAME visualization_hdf5
+      COMMAND "${MPIEXEC_EXECUTABLE}" "${MPIEXEC_NUMPROC_FLAG}" 2 $<TARGET_FILE:test_visualization>)
+    set_tests_properties(visualization_hdf5 PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+
   endif()
 endif()

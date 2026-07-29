@@ -1,9 +1,9 @@
 
 
-! DO NOT EDIT — generated from src/fypp/h5xdmf/h5fort_h5xdmf_parallel.fypp
+! DO NOT EDIT — generated from src/fypp/parallel/h5fort_parallel_visualization.fypp
 ! To regenerate: src/fypp/generate_fypp.sh
 
-module h5fort_parallel_hdf5_xdmf
+module h5fort_parallel_visualization
   use hdf5
 ! # define USE_MPI_F08
 # ifdef USE_MPI_F08
@@ -17,22 +17,8 @@ module h5fort_parallel_hdf5_xdmf
 
   public :: t_phdf5_writer
 
-  ! Checker flags
+  ! Checker flag
   logical, private :: is_file_initialized = .false.
-  logical, private :: is_written_fragment = .false.
-
-
-  integer, parameter :: MAX_ATTRS = 64
-
-  type :: t_phdf5_attr_info
-    character(len=64)  :: name      = ''
-    character(len=16)  :: attr_type = ''   ! Scalar / Vector / Tensor6 / Tensor
-    character(len=8)   :: center    = ''   ! Node / Cell
-    character(len=8)   :: num_type  = ''   ! Float / Int
-    integer            :: precision = 8
-    integer(int64)     :: n_total   = 0    ! グローバル要素数
-    integer            :: ncomp     = 1
-  end type t_phdf5_attr_info
 
   !--------------------------------------------------------------------
   ! Parallel HDF5 writer class
@@ -41,19 +27,17 @@ module h5fort_parallel_hdf5_xdmf
     ! Followings should be set by user before init()
     ! "UnstructuredGrid" or "PolyData"
     character(len=16) :: output_type = ''
-    ! FIXME: delete this. use `h5_dir // h5_filename` instead.
+    ! HDF5 group name and XDMF topology metadata.  For UnstructuredGrid,
+    ! blank/zero values default to ugrid/Hexahedron/8.
+    character(len=64) :: mesh_name = ''
+    character(len=32) :: topology_type = ''
+    integer :: nodes_per_element = 0
+    ! Output HDF5 path (one file per time step).
     character(len=:), allocatable :: h5_filepath
-    character(len=:), allocatable :: h5_dir
-    ! XDMF
-    ! 出力ディレクトリ (metadata/)
-    character(len=:), allocatable :: metadata_dir
-    ! HDF5 ファイル名 (ts0000.h5)
-    character(len=:), allocatable :: h5_filename
-    ! HDF5 ファイルへの相対ディレクトリ (../phdf5)
-    character(len=:), allocatable :: rel_dir_meta2h5
 
-    ! Followings should be `owned` number of points/cells for this rank, don't include ghost points/cells.
-    ! But is not necessary to be exact because they can be merged in ParaView.
+    ! num_cells is the number of owned cells written by this rank.
+    ! num_points includes every local node referenced by those cells; shared
+    ! boundary/halo node copies may be duplicated between ranks.
     integer(int64)    :: num_points  = 0_int64
     integer(int64)    :: num_cells   = 0_int64
 
@@ -79,18 +63,8 @@ module h5fort_parallel_hdf5_xdmf
     integer(HID_T), private :: gid_cdata = -1
     integer(HID_T), private :: xfer_id   = -1   ! H5P_DATASET_XFER (Collective)
 
-    ! XDMF fragment
-    integer            :: seq    = 0
+    ! Root metadata read by the Python postprocessor.
     real(real64)       :: time   = 0.0_real64
-    ! zero padding
-    integer            :: seq_digits = 5
-    integer            :: rank_digits = 4
-    integer, private   :: geometry_precision = 8
-    integer, private   :: topology_precision = 8
-
-    ! 属性リスト
-    integer, private :: n_attrs = 0
-    type(t_phdf5_attr_info) :: attrs(MAX_ATTRS)
 
   contains
     procedure :: init  => phdf5_init
@@ -209,13 +183,6 @@ module h5fort_parallel_hdf5_xdmf
       write_cell_1d_real128, &
       write_cell_2d_real128
 
-    ! xdmf fragment
-    procedure :: add_point_attr_1d   => phdf5_xdmf_add_point_1d
-    procedure :: add_point_attr_2d   => phdf5_xdmf_add_point_2d
-    generic   :: add_point_attr      => add_point_attr_1d, add_point_attr_2d
-    procedure :: add_cell_attr_i32   => phdf5_xdmf_add_cell_i32
-    generic   :: add_cell_attr       => add_cell_attr_i32
-    procedure :: write_fragment => phdf5_xdmf_write_fragment
   end type t_phdf5_writer
 
 contains
@@ -286,8 +253,21 @@ contains
     select case (trim(self%output_type))
     case ('UnstructuredGrid', 'ugrid', 'unstructuredgrid', 'UGRID', 'vtu', 'VTU', 'Unstructured', 'unstructured')
       self%output_type = 'ugrid'
+      if (len_trim(self%mesh_name) == 0) self%mesh_name = 'ugrid'
+      if (len_trim(self%topology_type) == 0 .and. self%nodes_per_element == 0) then
+        self%topology_type = 'Hexahedron'
+        self%nodes_per_element = 8
+      else if (len_trim(self%topology_type) == 0 .or. self%nodes_per_element <= 0) then
+        if (self%me == 0) then
+          write(error_unit,'(a)') 'ERROR phdf5_init: topology_type and nodes_per_element must be set together'
+        end if
+        call MPI_Abort(self%comm, 1, mpi_err)
+      end if
     case ('PolyData', 'polydata', 'POLYDATA', 'vtp', 'VTP', 'PointData', 'pointdata', 'POINTDATA', 'Point', 'point')
       self%output_type = 'polydata'
+      if (len_trim(self%mesh_name) == 0) self%mesh_name = 'polydata'
+      self%topology_type = 'Polyvertex'
+      self%nodes_per_element = 1
     case default
       if (self%me == 0) then
         write(error_unit,'(a)') 'ERROR phdf5_init: unknown output_type: ' // trim(self%output_type)
@@ -336,10 +316,15 @@ contains
       call MPI_Abort(self%comm, 1, mpi_err)
     end if
 
+    if (.not. file_exists) then
+      call write_int32_attribute_(self%file_id, 'scheme_version', 1_int32)
+      call write_real64_attribute_(self%file_id, 'time', self%time)
+    end if
+
     !------------------------------------------------------------------
     ! グループ作成（全ランク集合的）
     !------------------------------------------------------------------
-    call h5gcreate_f(self%file_id, trim(self%output_type), gid_base, hdferr)
+    call h5gcreate_f(self%file_id, trim(self%mesh_name), gid_base, hdferr)
 
     ! geometry, point_data グループ（全ランク集合的）
     call h5gcreate_f(gid_base, 'geometry',   self%gid_geom,  hdferr)
@@ -350,6 +335,8 @@ contains
     if (trim(self%output_type) == 'ugrid') then
       call h5gcreate_f(gid_base, 'cell_data', self%gid_cdata, hdferr)
     end if
+    call write_string_attribute_(gid_base, 'topology_type', trim(self%topology_type))
+    call write_int32_attribute_(gid_base, 'nodes_per_element', int(self%nodes_per_element, int32))
 
     call h5gclose_f(gid_base, hdferr)
 
@@ -387,7 +374,8 @@ contains
 
   !====================================================================
   ! write_geometry_ugrid: nodes + connectivity -> /geometry
-  !   connectivity はグローバル 0-indexed で渡す（呼び出し側が変換済み）。
+  !   connectivity は rank-local 0-origin node ID で渡す。
+  !   HDF5 へ書くときに、この writer が rank の global output offset を加える。
   ! write_geometry_polydata: nodes のみ -> /geometry
   !====================================================================
   subroutine phdf5_write_geom_ugrid_real32_int8(self, nodes, connectivity)
@@ -400,12 +388,12 @@ block
 
   associate(check_shape_expected__ => [3_int64, self%num_points])
     if (rank(nodes) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
       end if
     end do
   end associate
@@ -413,27 +401,33 @@ end block
 block
   integer :: check_shape_d__
 
-  associate(check_shape_expected__ => [8_int64, self%num_cells])
+  associate(check_shape_expected__ => [int(self%nodes_per_element, int64), self%num_cells])
     if (rank(connectivity) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
       end if
     end do
   end associate
 end block
+    if (size(connectivity) > 0) then
+      if (minval(int(connectivity, int64)) < 0_int64 .or. &
+          maxval(int(connectivity, int64)) >= self%num_points) then
+        error stop "[h5fortran/VISUALIZATION] connectivity contains an out-of-range local node ID"
+      end if
+    end if
     ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
     call write_slab_real32_2d_(self%gid_geom, 'nodes', &
       [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
 
-    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    ! Convert rank-local IDs to the concatenated HDF5 node numbering.
     call write_slab_int8_2d_(self%gid_geom, 'connectivity', &
-      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
-    self%geometry_precision = 4
-    self%topology_precision = 1
+      [int(self%nodes_per_element, int64), self%num_cells], &
+      self%offset_cells, self%total_cells, &
+      connectivity + int(self%offset_points, int8), self%xfer_id)
   end subroutine phdf5_write_geom_ugrid_real32_int8
 
   subroutine phdf5_write_geom_ugrid_real32_int16(self, nodes, connectivity)
@@ -446,12 +440,12 @@ block
 
   associate(check_shape_expected__ => [3_int64, self%num_points])
     if (rank(nodes) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
       end if
     end do
   end associate
@@ -459,27 +453,33 @@ end block
 block
   integer :: check_shape_d__
 
-  associate(check_shape_expected__ => [8_int64, self%num_cells])
+  associate(check_shape_expected__ => [int(self%nodes_per_element, int64), self%num_cells])
     if (rank(connectivity) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
       end if
     end do
   end associate
 end block
+    if (size(connectivity) > 0) then
+      if (minval(int(connectivity, int64)) < 0_int64 .or. &
+          maxval(int(connectivity, int64)) >= self%num_points) then
+        error stop "[h5fortran/VISUALIZATION] connectivity contains an out-of-range local node ID"
+      end if
+    end if
     ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
     call write_slab_real32_2d_(self%gid_geom, 'nodes', &
       [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
 
-    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    ! Convert rank-local IDs to the concatenated HDF5 node numbering.
     call write_slab_int16_2d_(self%gid_geom, 'connectivity', &
-      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
-    self%geometry_precision = 4
-    self%topology_precision = 2
+      [int(self%nodes_per_element, int64), self%num_cells], &
+      self%offset_cells, self%total_cells, &
+      connectivity + int(self%offset_points, int16), self%xfer_id)
   end subroutine phdf5_write_geom_ugrid_real32_int16
 
   subroutine phdf5_write_geom_ugrid_real32_int32(self, nodes, connectivity)
@@ -492,12 +492,12 @@ block
 
   associate(check_shape_expected__ => [3_int64, self%num_points])
     if (rank(nodes) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
       end if
     end do
   end associate
@@ -505,27 +505,33 @@ end block
 block
   integer :: check_shape_d__
 
-  associate(check_shape_expected__ => [8_int64, self%num_cells])
+  associate(check_shape_expected__ => [int(self%nodes_per_element, int64), self%num_cells])
     if (rank(connectivity) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
       end if
     end do
   end associate
 end block
+    if (size(connectivity) > 0) then
+      if (minval(int(connectivity, int64)) < 0_int64 .or. &
+          maxval(int(connectivity, int64)) >= self%num_points) then
+        error stop "[h5fortran/VISUALIZATION] connectivity contains an out-of-range local node ID"
+      end if
+    end if
     ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
     call write_slab_real32_2d_(self%gid_geom, 'nodes', &
       [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
 
-    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    ! Convert rank-local IDs to the concatenated HDF5 node numbering.
     call write_slab_int32_2d_(self%gid_geom, 'connectivity', &
-      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
-    self%geometry_precision = 4
-    self%topology_precision = 4
+      [int(self%nodes_per_element, int64), self%num_cells], &
+      self%offset_cells, self%total_cells, &
+      connectivity + int(self%offset_points, int32), self%xfer_id)
   end subroutine phdf5_write_geom_ugrid_real32_int32
 
   subroutine phdf5_write_geom_ugrid_real32_int64(self, nodes, connectivity)
@@ -538,12 +544,12 @@ block
 
   associate(check_shape_expected__ => [3_int64, self%num_points])
     if (rank(nodes) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
       end if
     end do
   end associate
@@ -551,27 +557,33 @@ end block
 block
   integer :: check_shape_d__
 
-  associate(check_shape_expected__ => [8_int64, self%num_cells])
+  associate(check_shape_expected__ => [int(self%nodes_per_element, int64), self%num_cells])
     if (rank(connectivity) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
       end if
     end do
   end associate
 end block
+    if (size(connectivity) > 0) then
+      if (minval(int(connectivity, int64)) < 0_int64 .or. &
+          maxval(int(connectivity, int64)) >= self%num_points) then
+        error stop "[h5fortran/VISUALIZATION] connectivity contains an out-of-range local node ID"
+      end if
+    end if
     ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
     call write_slab_real32_2d_(self%gid_geom, 'nodes', &
       [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
 
-    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    ! Convert rank-local IDs to the concatenated HDF5 node numbering.
     call write_slab_int64_2d_(self%gid_geom, 'connectivity', &
-      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
-    self%geometry_precision = 4
-    self%topology_precision = 8
+      [int(self%nodes_per_element, int64), self%num_cells], &
+      self%offset_cells, self%total_cells, &
+      connectivity + int(self%offset_points, int64), self%xfer_id)
   end subroutine phdf5_write_geom_ugrid_real32_int64
 
   subroutine phdf5_geom_polydata_real32(self, nodes)
@@ -583,19 +595,18 @@ block
 
   associate(check_shape_expected__ => [3_int64, self%num_points])
     if (rank(nodes) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
       end if
     end do
   end associate
 end block
     call write_slab_real32_2d_(self%gid_geom, 'nodes', &
       [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
-    self%geometry_precision = 4
   end subroutine phdf5_geom_polydata_real32
 
   subroutine phdf5_write_geom_ugrid_real64_int8(self, nodes, connectivity)
@@ -608,12 +619,12 @@ block
 
   associate(check_shape_expected__ => [3_int64, self%num_points])
     if (rank(nodes) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
       end if
     end do
   end associate
@@ -621,27 +632,33 @@ end block
 block
   integer :: check_shape_d__
 
-  associate(check_shape_expected__ => [8_int64, self%num_cells])
+  associate(check_shape_expected__ => [int(self%nodes_per_element, int64), self%num_cells])
     if (rank(connectivity) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
       end if
     end do
   end associate
 end block
+    if (size(connectivity) > 0) then
+      if (minval(int(connectivity, int64)) < 0_int64 .or. &
+          maxval(int(connectivity, int64)) >= self%num_points) then
+        error stop "[h5fortran/VISUALIZATION] connectivity contains an out-of-range local node ID"
+      end if
+    end if
     ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
     call write_slab_real64_2d_(self%gid_geom, 'nodes', &
       [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
 
-    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    ! Convert rank-local IDs to the concatenated HDF5 node numbering.
     call write_slab_int8_2d_(self%gid_geom, 'connectivity', &
-      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
-    self%geometry_precision = 8
-    self%topology_precision = 1
+      [int(self%nodes_per_element, int64), self%num_cells], &
+      self%offset_cells, self%total_cells, &
+      connectivity + int(self%offset_points, int8), self%xfer_id)
   end subroutine phdf5_write_geom_ugrid_real64_int8
 
   subroutine phdf5_write_geom_ugrid_real64_int16(self, nodes, connectivity)
@@ -654,12 +671,12 @@ block
 
   associate(check_shape_expected__ => [3_int64, self%num_points])
     if (rank(nodes) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
       end if
     end do
   end associate
@@ -667,27 +684,33 @@ end block
 block
   integer :: check_shape_d__
 
-  associate(check_shape_expected__ => [8_int64, self%num_cells])
+  associate(check_shape_expected__ => [int(self%nodes_per_element, int64), self%num_cells])
     if (rank(connectivity) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
       end if
     end do
   end associate
 end block
+    if (size(connectivity) > 0) then
+      if (minval(int(connectivity, int64)) < 0_int64 .or. &
+          maxval(int(connectivity, int64)) >= self%num_points) then
+        error stop "[h5fortran/VISUALIZATION] connectivity contains an out-of-range local node ID"
+      end if
+    end if
     ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
     call write_slab_real64_2d_(self%gid_geom, 'nodes', &
       [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
 
-    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    ! Convert rank-local IDs to the concatenated HDF5 node numbering.
     call write_slab_int16_2d_(self%gid_geom, 'connectivity', &
-      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
-    self%geometry_precision = 8
-    self%topology_precision = 2
+      [int(self%nodes_per_element, int64), self%num_cells], &
+      self%offset_cells, self%total_cells, &
+      connectivity + int(self%offset_points, int16), self%xfer_id)
   end subroutine phdf5_write_geom_ugrid_real64_int16
 
   subroutine phdf5_write_geom_ugrid_real64_int32(self, nodes, connectivity)
@@ -700,12 +723,12 @@ block
 
   associate(check_shape_expected__ => [3_int64, self%num_points])
     if (rank(nodes) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
       end if
     end do
   end associate
@@ -713,27 +736,33 @@ end block
 block
   integer :: check_shape_d__
 
-  associate(check_shape_expected__ => [8_int64, self%num_cells])
+  associate(check_shape_expected__ => [int(self%nodes_per_element, int64), self%num_cells])
     if (rank(connectivity) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
       end if
     end do
   end associate
 end block
+    if (size(connectivity) > 0) then
+      if (minval(int(connectivity, int64)) < 0_int64 .or. &
+          maxval(int(connectivity, int64)) >= self%num_points) then
+        error stop "[h5fortran/VISUALIZATION] connectivity contains an out-of-range local node ID"
+      end if
+    end if
     ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
     call write_slab_real64_2d_(self%gid_geom, 'nodes', &
       [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
 
-    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    ! Convert rank-local IDs to the concatenated HDF5 node numbering.
     call write_slab_int32_2d_(self%gid_geom, 'connectivity', &
-      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
-    self%geometry_precision = 8
-    self%topology_precision = 4
+      [int(self%nodes_per_element, int64), self%num_cells], &
+      self%offset_cells, self%total_cells, &
+      connectivity + int(self%offset_points, int32), self%xfer_id)
   end subroutine phdf5_write_geom_ugrid_real64_int32
 
   subroutine phdf5_write_geom_ugrid_real64_int64(self, nodes, connectivity)
@@ -746,12 +775,12 @@ block
 
   associate(check_shape_expected__ => [3_int64, self%num_points])
     if (rank(nodes) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
       end if
     end do
   end associate
@@ -759,27 +788,33 @@ end block
 block
   integer :: check_shape_d__
 
-  associate(check_shape_expected__ => [8_int64, self%num_cells])
+  associate(check_shape_expected__ => [int(self%nodes_per_element, int64), self%num_cells])
     if (rank(connectivity) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
       end if
     end do
   end associate
 end block
+    if (size(connectivity) > 0) then
+      if (minval(int(connectivity, int64)) < 0_int64 .or. &
+          maxval(int(connectivity, int64)) >= self%num_points) then
+        error stop "[h5fortran/VISUALIZATION] connectivity contains an out-of-range local node ID"
+      end if
+    end if
     ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
     call write_slab_real64_2d_(self%gid_geom, 'nodes', &
       [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
 
-    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    ! Convert rank-local IDs to the concatenated HDF5 node numbering.
     call write_slab_int64_2d_(self%gid_geom, 'connectivity', &
-      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
-    self%geometry_precision = 8
-    self%topology_precision = 8
+      [int(self%nodes_per_element, int64), self%num_cells], &
+      self%offset_cells, self%total_cells, &
+      connectivity + int(self%offset_points, int64), self%xfer_id)
   end subroutine phdf5_write_geom_ugrid_real64_int64
 
   subroutine phdf5_geom_polydata_real64(self, nodes)
@@ -791,19 +826,18 @@ block
 
   associate(check_shape_expected__ => [3_int64, self%num_points])
     if (rank(nodes) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
       end if
     end do
   end associate
 end block
     call write_slab_real64_2d_(self%gid_geom, 'nodes', &
       [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
-    self%geometry_precision = 8
   end subroutine phdf5_geom_polydata_real64
 
   subroutine phdf5_write_geom_ugrid_real128_int8(self, nodes, connectivity)
@@ -816,12 +850,12 @@ block
 
   associate(check_shape_expected__ => [3_int64, self%num_points])
     if (rank(nodes) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
       end if
     end do
   end associate
@@ -829,27 +863,33 @@ end block
 block
   integer :: check_shape_d__
 
-  associate(check_shape_expected__ => [8_int64, self%num_cells])
+  associate(check_shape_expected__ => [int(self%nodes_per_element, int64), self%num_cells])
     if (rank(connectivity) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
       end if
     end do
   end associate
 end block
+    if (size(connectivity) > 0) then
+      if (minval(int(connectivity, int64)) < 0_int64 .or. &
+          maxval(int(connectivity, int64)) >= self%num_points) then
+        error stop "[h5fortran/VISUALIZATION] connectivity contains an out-of-range local node ID"
+      end if
+    end if
     ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
     call write_slab_real128_2d_(self%gid_geom, 'nodes', &
       [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
 
-    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    ! Convert rank-local IDs to the concatenated HDF5 node numbering.
     call write_slab_int8_2d_(self%gid_geom, 'connectivity', &
-      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
-    self%geometry_precision = 16
-    self%topology_precision = 1
+      [int(self%nodes_per_element, int64), self%num_cells], &
+      self%offset_cells, self%total_cells, &
+      connectivity + int(self%offset_points, int8), self%xfer_id)
   end subroutine phdf5_write_geom_ugrid_real128_int8
 
   subroutine phdf5_write_geom_ugrid_real128_int16(self, nodes, connectivity)
@@ -862,12 +902,12 @@ block
 
   associate(check_shape_expected__ => [3_int64, self%num_points])
     if (rank(nodes) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
       end if
     end do
   end associate
@@ -875,27 +915,33 @@ end block
 block
   integer :: check_shape_d__
 
-  associate(check_shape_expected__ => [8_int64, self%num_cells])
+  associate(check_shape_expected__ => [int(self%nodes_per_element, int64), self%num_cells])
     if (rank(connectivity) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
       end if
     end do
   end associate
 end block
+    if (size(connectivity) > 0) then
+      if (minval(int(connectivity, int64)) < 0_int64 .or. &
+          maxval(int(connectivity, int64)) >= self%num_points) then
+        error stop "[h5fortran/VISUALIZATION] connectivity contains an out-of-range local node ID"
+      end if
+    end if
     ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
     call write_slab_real128_2d_(self%gid_geom, 'nodes', &
       [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
 
-    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    ! Convert rank-local IDs to the concatenated HDF5 node numbering.
     call write_slab_int16_2d_(self%gid_geom, 'connectivity', &
-      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
-    self%geometry_precision = 16
-    self%topology_precision = 2
+      [int(self%nodes_per_element, int64), self%num_cells], &
+      self%offset_cells, self%total_cells, &
+      connectivity + int(self%offset_points, int16), self%xfer_id)
   end subroutine phdf5_write_geom_ugrid_real128_int16
 
   subroutine phdf5_write_geom_ugrid_real128_int32(self, nodes, connectivity)
@@ -908,12 +954,12 @@ block
 
   associate(check_shape_expected__ => [3_int64, self%num_points])
     if (rank(nodes) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
       end if
     end do
   end associate
@@ -921,27 +967,33 @@ end block
 block
   integer :: check_shape_d__
 
-  associate(check_shape_expected__ => [8_int64, self%num_cells])
+  associate(check_shape_expected__ => [int(self%nodes_per_element, int64), self%num_cells])
     if (rank(connectivity) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
       end if
     end do
   end associate
 end block
+    if (size(connectivity) > 0) then
+      if (minval(int(connectivity, int64)) < 0_int64 .or. &
+          maxval(int(connectivity, int64)) >= self%num_points) then
+        error stop "[h5fortran/VISUALIZATION] connectivity contains an out-of-range local node ID"
+      end if
+    end if
     ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
     call write_slab_real128_2d_(self%gid_geom, 'nodes', &
       [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
 
-    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    ! Convert rank-local IDs to the concatenated HDF5 node numbering.
     call write_slab_int32_2d_(self%gid_geom, 'connectivity', &
-      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
-    self%geometry_precision = 16
-    self%topology_precision = 4
+      [int(self%nodes_per_element, int64), self%num_cells], &
+      self%offset_cells, self%total_cells, &
+      connectivity + int(self%offset_points, int32), self%xfer_id)
   end subroutine phdf5_write_geom_ugrid_real128_int32
 
   subroutine phdf5_write_geom_ugrid_real128_int64(self, nodes, connectivity)
@@ -954,12 +1006,12 @@ block
 
   associate(check_shape_expected__ => [3_int64, self%num_points])
     if (rank(nodes) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
       end if
     end do
   end associate
@@ -967,27 +1019,33 @@ end block
 block
   integer :: check_shape_d__
 
-  associate(check_shape_expected__ => [8_int64, self%num_cells])
+  associate(check_shape_expected__ => [int(self%nodes_per_element, int64), self%num_cells])
     if (rank(connectivity) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(connectivity, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `connectivity` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `connectivity` has incorrect shape"
       end if
     end do
   end associate
 end block
+    if (size(connectivity) > 0) then
+      if (minval(int(connectivity, int64)) < 0_int64 .or. &
+          maxval(int(connectivity, int64)) >= self%num_points) then
+        error stop "[h5fortran/VISUALIZATION] connectivity contains an out-of-range local node ID"
+      end if
+    end if
     ! nodes: Fortran (3, np) 列優先 -> HDF5 C [total_np][3]
     call write_slab_real128_2d_(self%gid_geom, 'nodes', &
       [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
 
-    ! connectivity: グローバル 0-indexed をそのまま書き込む
+    ! Convert rank-local IDs to the concatenated HDF5 node numbering.
     call write_slab_int64_2d_(self%gid_geom, 'connectivity', &
-      [8_int64, self%num_cells], self%offset_cells, self%total_cells, connectivity, self%xfer_id)
-    self%geometry_precision = 16
-    self%topology_precision = 8
+      [int(self%nodes_per_element, int64), self%num_cells], &
+      self%offset_cells, self%total_cells, &
+      connectivity + int(self%offset_points, int64), self%xfer_id)
   end subroutine phdf5_write_geom_ugrid_real128_int64
 
   subroutine phdf5_geom_polydata_real128(self, nodes)
@@ -999,19 +1057,18 @@ block
 
   associate(check_shape_expected__ => [3_int64, self%num_points])
     if (rank(nodes) /= size(check_shape_expected__)) then
-      error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+      error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
     end if
 
     do check_shape_d__ = 1, size(check_shape_expected__)
       if (size(nodes, dim=check_shape_d__) /= check_shape_expected__(check_shape_d__)) then
-        error stop "[h5fortran/H5XDMF] Array `nodes` has incorrect shape"
+        error stop "[h5fortran/VISUALIZATION] Array `nodes` has incorrect shape"
       end if
     end do
   end associate
 end block
     call write_slab_real128_2d_(self%gid_geom, 'nodes', &
       [3_int64, self%num_points], self%offset_points, self%total_points, nodes, self%xfer_id)
-    self%geometry_precision = 16
   end subroutine phdf5_geom_polydata_real128
 
 
@@ -1024,7 +1081,7 @@ end block
     character(len=*), intent(in) :: field_name
 
     if (int(size(data, 1), int64) /= self%num_points) then
-      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+      error stop "[h5fortran/VISUALIZATION] point-data size does not match num_points"
     end if
     call write_slab_int8_1d_(&
       self%gid_pdata, trim(field_name), &
@@ -1032,8 +1089,7 @@ end block
       self%offset_points, self%total_points, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Node', 'Int', 1, &
-      self%total_points, 1)
+    call write_field_metadata_(self%gid_pdata, field_name, 1)
   end subroutine phdf5_point_1d_int8
 
   subroutine phdf5_cell_1d_int8(self, data, field_name)
@@ -1046,7 +1102,7 @@ end block
       stop 1
     end if
     if (int(size(data, 1), int64) /= self%num_cells) then
-      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+      error stop "[h5fortran/VISUALIZATION] cell-data size does not match num_cells"
     end if
 
     call write_slab_int8_1d_(&
@@ -1055,8 +1111,7 @@ end block
       self%offset_cells, self%total_cells, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Cell', 'Int', 1, &
-      self%total_cells, 1)
+    call write_field_metadata_(self%gid_cdata, field_name, 1)
 
   end subroutine phdf5_cell_1d_int8
 
@@ -1066,7 +1121,7 @@ end block
     character(len=*), intent(in) :: field_name
 
     if (int(size(data, 2), int64) /= self%num_points) then
-      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+      error stop "[h5fortran/VISUALIZATION] point-data size does not match num_points"
     end if
     call write_slab_int8_2d_(&
       self%gid_pdata, trim(field_name), &
@@ -1074,8 +1129,7 @@ end block
       self%offset_points, self%total_points, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Node', 'Int', 1, &
-      self%total_points, size(data, 1))
+    call write_field_metadata_(self%gid_pdata, field_name, size(data, 1))
   end subroutine phdf5_point_2d_int8
 
   subroutine phdf5_cell_2d_int8(self, data, field_name)
@@ -1088,7 +1142,7 @@ end block
       stop 1
     end if
     if (int(size(data, 2), int64) /= self%num_cells) then
-      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+      error stop "[h5fortran/VISUALIZATION] cell-data size does not match num_cells"
     end if
 
     call write_slab_int8_2d_(&
@@ -1097,8 +1151,7 @@ end block
       self%offset_cells, self%total_cells, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Cell', 'Int', 1, &
-      self%total_cells, size(data, 1))
+    call write_field_metadata_(self%gid_cdata, field_name, size(data, 1))
 
   end subroutine phdf5_cell_2d_int8
 
@@ -1108,7 +1161,7 @@ end block
     character(len=*), intent(in) :: field_name
 
     if (int(size(data, 1), int64) /= self%num_points) then
-      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+      error stop "[h5fortran/VISUALIZATION] point-data size does not match num_points"
     end if
     call write_slab_int16_1d_(&
       self%gid_pdata, trim(field_name), &
@@ -1116,8 +1169,7 @@ end block
       self%offset_points, self%total_points, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Node', 'Int', 2, &
-      self%total_points, 1)
+    call write_field_metadata_(self%gid_pdata, field_name, 1)
   end subroutine phdf5_point_1d_int16
 
   subroutine phdf5_cell_1d_int16(self, data, field_name)
@@ -1130,7 +1182,7 @@ end block
       stop 1
     end if
     if (int(size(data, 1), int64) /= self%num_cells) then
-      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+      error stop "[h5fortran/VISUALIZATION] cell-data size does not match num_cells"
     end if
 
     call write_slab_int16_1d_(&
@@ -1139,8 +1191,7 @@ end block
       self%offset_cells, self%total_cells, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Cell', 'Int', 2, &
-      self%total_cells, 1)
+    call write_field_metadata_(self%gid_cdata, field_name, 1)
 
   end subroutine phdf5_cell_1d_int16
 
@@ -1150,7 +1201,7 @@ end block
     character(len=*), intent(in) :: field_name
 
     if (int(size(data, 2), int64) /= self%num_points) then
-      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+      error stop "[h5fortran/VISUALIZATION] point-data size does not match num_points"
     end if
     call write_slab_int16_2d_(&
       self%gid_pdata, trim(field_name), &
@@ -1158,8 +1209,7 @@ end block
       self%offset_points, self%total_points, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Node', 'Int', 2, &
-      self%total_points, size(data, 1))
+    call write_field_metadata_(self%gid_pdata, field_name, size(data, 1))
   end subroutine phdf5_point_2d_int16
 
   subroutine phdf5_cell_2d_int16(self, data, field_name)
@@ -1172,7 +1222,7 @@ end block
       stop 1
     end if
     if (int(size(data, 2), int64) /= self%num_cells) then
-      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+      error stop "[h5fortran/VISUALIZATION] cell-data size does not match num_cells"
     end if
 
     call write_slab_int16_2d_(&
@@ -1181,8 +1231,7 @@ end block
       self%offset_cells, self%total_cells, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Cell', 'Int', 2, &
-      self%total_cells, size(data, 1))
+    call write_field_metadata_(self%gid_cdata, field_name, size(data, 1))
 
   end subroutine phdf5_cell_2d_int16
 
@@ -1192,7 +1241,7 @@ end block
     character(len=*), intent(in) :: field_name
 
     if (int(size(data, 1), int64) /= self%num_points) then
-      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+      error stop "[h5fortran/VISUALIZATION] point-data size does not match num_points"
     end if
     call write_slab_int32_1d_(&
       self%gid_pdata, trim(field_name), &
@@ -1200,8 +1249,7 @@ end block
       self%offset_points, self%total_points, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Node', 'Int', 4, &
-      self%total_points, 1)
+    call write_field_metadata_(self%gid_pdata, field_name, 1)
   end subroutine phdf5_point_1d_int32
 
   subroutine phdf5_cell_1d_int32(self, data, field_name)
@@ -1214,7 +1262,7 @@ end block
       stop 1
     end if
     if (int(size(data, 1), int64) /= self%num_cells) then
-      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+      error stop "[h5fortran/VISUALIZATION] cell-data size does not match num_cells"
     end if
 
     call write_slab_int32_1d_(&
@@ -1223,8 +1271,7 @@ end block
       self%offset_cells, self%total_cells, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Cell', 'Int', 4, &
-      self%total_cells, 1)
+    call write_field_metadata_(self%gid_cdata, field_name, 1)
 
   end subroutine phdf5_cell_1d_int32
 
@@ -1234,7 +1281,7 @@ end block
     character(len=*), intent(in) :: field_name
 
     if (int(size(data, 2), int64) /= self%num_points) then
-      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+      error stop "[h5fortran/VISUALIZATION] point-data size does not match num_points"
     end if
     call write_slab_int32_2d_(&
       self%gid_pdata, trim(field_name), &
@@ -1242,8 +1289,7 @@ end block
       self%offset_points, self%total_points, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Node', 'Int', 4, &
-      self%total_points, size(data, 1))
+    call write_field_metadata_(self%gid_pdata, field_name, size(data, 1))
   end subroutine phdf5_point_2d_int32
 
   subroutine phdf5_cell_2d_int32(self, data, field_name)
@@ -1256,7 +1302,7 @@ end block
       stop 1
     end if
     if (int(size(data, 2), int64) /= self%num_cells) then
-      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+      error stop "[h5fortran/VISUALIZATION] cell-data size does not match num_cells"
     end if
 
     call write_slab_int32_2d_(&
@@ -1265,8 +1311,7 @@ end block
       self%offset_cells, self%total_cells, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Cell', 'Int', 4, &
-      self%total_cells, size(data, 1))
+    call write_field_metadata_(self%gid_cdata, field_name, size(data, 1))
 
   end subroutine phdf5_cell_2d_int32
 
@@ -1276,7 +1321,7 @@ end block
     character(len=*), intent(in) :: field_name
 
     if (int(size(data, 1), int64) /= self%num_points) then
-      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+      error stop "[h5fortran/VISUALIZATION] point-data size does not match num_points"
     end if
     call write_slab_int64_1d_(&
       self%gid_pdata, trim(field_name), &
@@ -1284,8 +1329,7 @@ end block
       self%offset_points, self%total_points, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Node', 'Int', 8, &
-      self%total_points, 1)
+    call write_field_metadata_(self%gid_pdata, field_name, 1)
   end subroutine phdf5_point_1d_int64
 
   subroutine phdf5_cell_1d_int64(self, data, field_name)
@@ -1298,7 +1342,7 @@ end block
       stop 1
     end if
     if (int(size(data, 1), int64) /= self%num_cells) then
-      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+      error stop "[h5fortran/VISUALIZATION] cell-data size does not match num_cells"
     end if
 
     call write_slab_int64_1d_(&
@@ -1307,8 +1351,7 @@ end block
       self%offset_cells, self%total_cells, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Cell', 'Int', 8, &
-      self%total_cells, 1)
+    call write_field_metadata_(self%gid_cdata, field_name, 1)
 
   end subroutine phdf5_cell_1d_int64
 
@@ -1318,7 +1361,7 @@ end block
     character(len=*), intent(in) :: field_name
 
     if (int(size(data, 2), int64) /= self%num_points) then
-      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+      error stop "[h5fortran/VISUALIZATION] point-data size does not match num_points"
     end if
     call write_slab_int64_2d_(&
       self%gid_pdata, trim(field_name), &
@@ -1326,8 +1369,7 @@ end block
       self%offset_points, self%total_points, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Node', 'Int', 8, &
-      self%total_points, size(data, 1))
+    call write_field_metadata_(self%gid_pdata, field_name, size(data, 1))
   end subroutine phdf5_point_2d_int64
 
   subroutine phdf5_cell_2d_int64(self, data, field_name)
@@ -1340,7 +1382,7 @@ end block
       stop 1
     end if
     if (int(size(data, 2), int64) /= self%num_cells) then
-      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+      error stop "[h5fortran/VISUALIZATION] cell-data size does not match num_cells"
     end if
 
     call write_slab_int64_2d_(&
@@ -1349,8 +1391,7 @@ end block
       self%offset_cells, self%total_cells, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Cell', 'Int', 8, &
-      self%total_cells, size(data, 1))
+    call write_field_metadata_(self%gid_cdata, field_name, size(data, 1))
 
   end subroutine phdf5_cell_2d_int64
 
@@ -1360,7 +1401,7 @@ end block
     character(len=*), intent(in) :: field_name
 
     if (int(size(data, 1), int64) /= self%num_points) then
-      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+      error stop "[h5fortran/VISUALIZATION] point-data size does not match num_points"
     end if
     call write_slab_real32_1d_(&
       self%gid_pdata, trim(field_name), &
@@ -1368,8 +1409,7 @@ end block
       self%offset_points, self%total_points, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Node', 'Float', 4, &
-      self%total_points, 1)
+    call write_field_metadata_(self%gid_pdata, field_name, 1)
   end subroutine phdf5_point_1d_real32
 
   subroutine phdf5_cell_1d_real32(self, data, field_name)
@@ -1382,7 +1422,7 @@ end block
       stop 1
     end if
     if (int(size(data, 1), int64) /= self%num_cells) then
-      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+      error stop "[h5fortran/VISUALIZATION] cell-data size does not match num_cells"
     end if
 
     call write_slab_real32_1d_(&
@@ -1391,8 +1431,7 @@ end block
       self%offset_cells, self%total_cells, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Cell', 'Float', 4, &
-      self%total_cells, 1)
+    call write_field_metadata_(self%gid_cdata, field_name, 1)
 
   end subroutine phdf5_cell_1d_real32
 
@@ -1402,7 +1441,7 @@ end block
     character(len=*), intent(in) :: field_name
 
     if (int(size(data, 2), int64) /= self%num_points) then
-      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+      error stop "[h5fortran/VISUALIZATION] point-data size does not match num_points"
     end if
     call write_slab_real32_2d_(&
       self%gid_pdata, trim(field_name), &
@@ -1410,8 +1449,7 @@ end block
       self%offset_points, self%total_points, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Node', 'Float', 4, &
-      self%total_points, size(data, 1))
+    call write_field_metadata_(self%gid_pdata, field_name, size(data, 1))
   end subroutine phdf5_point_2d_real32
 
   subroutine phdf5_cell_2d_real32(self, data, field_name)
@@ -1424,7 +1462,7 @@ end block
       stop 1
     end if
     if (int(size(data, 2), int64) /= self%num_cells) then
-      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+      error stop "[h5fortran/VISUALIZATION] cell-data size does not match num_cells"
     end if
 
     call write_slab_real32_2d_(&
@@ -1433,8 +1471,7 @@ end block
       self%offset_cells, self%total_cells, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Cell', 'Float', 4, &
-      self%total_cells, size(data, 1))
+    call write_field_metadata_(self%gid_cdata, field_name, size(data, 1))
 
   end subroutine phdf5_cell_2d_real32
 
@@ -1444,7 +1481,7 @@ end block
     character(len=*), intent(in) :: field_name
 
     if (int(size(data, 1), int64) /= self%num_points) then
-      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+      error stop "[h5fortran/VISUALIZATION] point-data size does not match num_points"
     end if
     call write_slab_real64_1d_(&
       self%gid_pdata, trim(field_name), &
@@ -1452,8 +1489,7 @@ end block
       self%offset_points, self%total_points, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Node', 'Float', 8, &
-      self%total_points, 1)
+    call write_field_metadata_(self%gid_pdata, field_name, 1)
   end subroutine phdf5_point_1d_real64
 
   subroutine phdf5_cell_1d_real64(self, data, field_name)
@@ -1466,7 +1502,7 @@ end block
       stop 1
     end if
     if (int(size(data, 1), int64) /= self%num_cells) then
-      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+      error stop "[h5fortran/VISUALIZATION] cell-data size does not match num_cells"
     end if
 
     call write_slab_real64_1d_(&
@@ -1475,8 +1511,7 @@ end block
       self%offset_cells, self%total_cells, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Cell', 'Float', 8, &
-      self%total_cells, 1)
+    call write_field_metadata_(self%gid_cdata, field_name, 1)
 
   end subroutine phdf5_cell_1d_real64
 
@@ -1486,7 +1521,7 @@ end block
     character(len=*), intent(in) :: field_name
 
     if (int(size(data, 2), int64) /= self%num_points) then
-      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+      error stop "[h5fortran/VISUALIZATION] point-data size does not match num_points"
     end if
     call write_slab_real64_2d_(&
       self%gid_pdata, trim(field_name), &
@@ -1494,8 +1529,7 @@ end block
       self%offset_points, self%total_points, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Node', 'Float', 8, &
-      self%total_points, size(data, 1))
+    call write_field_metadata_(self%gid_pdata, field_name, size(data, 1))
   end subroutine phdf5_point_2d_real64
 
   subroutine phdf5_cell_2d_real64(self, data, field_name)
@@ -1508,7 +1542,7 @@ end block
       stop 1
     end if
     if (int(size(data, 2), int64) /= self%num_cells) then
-      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+      error stop "[h5fortran/VISUALIZATION] cell-data size does not match num_cells"
     end if
 
     call write_slab_real64_2d_(&
@@ -1517,8 +1551,7 @@ end block
       self%offset_cells, self%total_cells, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Cell', 'Float', 8, &
-      self%total_cells, size(data, 1))
+    call write_field_metadata_(self%gid_cdata, field_name, size(data, 1))
 
   end subroutine phdf5_cell_2d_real64
 
@@ -1528,7 +1561,7 @@ end block
     character(len=*), intent(in) :: field_name
 
     if (int(size(data, 1), int64) /= self%num_points) then
-      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+      error stop "[h5fortran/VISUALIZATION] point-data size does not match num_points"
     end if
     call write_slab_real128_1d_(&
       self%gid_pdata, trim(field_name), &
@@ -1536,8 +1569,7 @@ end block
       self%offset_points, self%total_points, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Node', 'Float', 16, &
-      self%total_points, 1)
+    call write_field_metadata_(self%gid_pdata, field_name, 1)
   end subroutine phdf5_point_1d_real128
 
   subroutine phdf5_cell_1d_real128(self, data, field_name)
@@ -1550,7 +1582,7 @@ end block
       stop 1
     end if
     if (int(size(data, 1), int64) /= self%num_cells) then
-      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+      error stop "[h5fortran/VISUALIZATION] cell-data size does not match num_cells"
     end if
 
     call write_slab_real128_1d_(&
@@ -1559,8 +1591,7 @@ end block
       self%offset_cells, self%total_cells, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Cell', 'Float', 16, &
-      self%total_cells, 1)
+    call write_field_metadata_(self%gid_cdata, field_name, 1)
 
   end subroutine phdf5_cell_1d_real128
 
@@ -1570,7 +1601,7 @@ end block
     character(len=*), intent(in) :: field_name
 
     if (int(size(data, 2), int64) /= self%num_points) then
-      error stop "[h5fortran/H5XDMF] point-data size does not match num_points"
+      error stop "[h5fortran/VISUALIZATION] point-data size does not match num_points"
     end if
     call write_slab_real128_2d_(&
       self%gid_pdata, trim(field_name), &
@@ -1578,8 +1609,7 @@ end block
       self%offset_points, self%total_points, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Node', 'Float', 16, &
-      self%total_points, size(data, 1))
+    call write_field_metadata_(self%gid_pdata, field_name, size(data, 1))
   end subroutine phdf5_point_2d_real128
 
   subroutine phdf5_cell_2d_real128(self, data, field_name)
@@ -1592,7 +1622,7 @@ end block
       stop 1
     end if
     if (int(size(data, 2), int64) /= self%num_cells) then
-      error stop "[h5fortran/H5XDMF] cell-data size does not match num_cells"
+      error stop "[h5fortran/VISUALIZATION] cell-data size does not match num_cells"
     end if
 
     call write_slab_real128_2d_(&
@@ -1601,8 +1631,7 @@ end block
       self%offset_cells, self%total_cells, &
       data, self%xfer_id&
     )
-    call register_attribute_(self, field_name, 'Cell', 'Float', 16, &
-      self%total_cells, size(data, 1))
+    call write_field_metadata_(self%gid_cdata, field_name, size(data, 1))
 
   end subroutine phdf5_cell_2d_real128
 
@@ -1621,7 +1650,7 @@ end block
   !   -> 全ランクが Collective I/O に参加しつつデータ転送なし
   !
   ! This helper intentionally creates fixed-size datasets to preserve the
-  ! current XDMF layout.  A future time-series/misc writer based on
+  ! current visualization HDF5 layout.  A future time-series/misc writer based on
   ! H5S_UNLIMITED should use a separate create/extend path.
   !====================================================================
   subroutine write_slab_int8_1d_(gid, dname, dims, offset, n_total, data, xfer_id)
@@ -2241,186 +2270,85 @@ end block
   end subroutine write_slab_real128_2d_
 
 
-  subroutine register_attribute_(self, field_name, center, num_type, precision, n_total, ncomp, update_existing)
-    class(t_phdf5_writer), intent(inout) :: self
-    character(len=*), intent(in) :: field_name, center, num_type
-    integer, intent(in) :: precision, ncomp
-    integer(int64), intent(in) :: n_total
-    logical, intent(in), optional :: update_existing
-    integer :: i, idx
-    logical :: update
-
-    update = .true.
-    if (present(update_existing)) update = update_existing
-    idx = 0
-    do i = 1, self%n_attrs
-      if (trim(self%attrs(i)%name) == trim(field_name) .and. &
-          trim(self%attrs(i)%center) == trim(center)) then
-        idx = i
-        exit
-      end if
-    end do
-    if (idx > 0 .and. .not. update) return
-    if (idx == 0) then
-      if (self%n_attrs >= MAX_ATTRS) then
-        error stop "[h5fortran/H5XDMF] too many attributes"
-      end if
-      self%n_attrs = self%n_attrs + 1
-      idx = self%n_attrs
-    end if
-
-    associate(a => self%attrs(idx))
-      a%name = trim(field_name)
-      a%center = trim(center)
-      a%num_type = trim(num_type)
-      a%precision = precision
-      a%n_total = n_total
-      a%ncomp = ncomp
-      select case (ncomp)
-      case (1)
-        a%attr_type = 'Scalar'
-      case (3)
-        a%attr_type = 'Vector'
-      case (6)
-        a%attr_type = 'Tensor6'
-      case (9)
-        a%attr_type = 'Tensor'
-      case default
-        error stop "[h5fortran/H5XDMF] ncomp must be 1, 3, 6, or 9"
-      end select
-    end associate
-  end subroutine register_attribute_
-
-  ! --------------------------------------------------------------------
-  ! add_point_attr_1d: スカラー点属性を登録
-  ! --------------------------------------------------------------------
-  subroutine phdf5_xdmf_add_point_1d(self, field_name)
-    class(t_phdf5_writer), intent(inout) :: self
+  subroutine write_field_metadata_(gid, field_name, ncomp)
+    integer(HID_T), intent(in) :: gid
     character(len=*), intent(in) :: field_name
+    integer, intent(in) :: ncomp
+    integer(HID_T) :: did
+    integer :: hdferr
+    character(len=16) :: attribute_type
 
-    call register_attribute_(self, field_name, 'Node', 'Float', 8, self%total_points, 1, .false.)
-  end subroutine phdf5_xdmf_add_point_1d
+    select case (ncomp)
+    case (1)
+      attribute_type = 'Scalar'
+    case (3)
+      attribute_type = 'Vector'
+    case (6)
+      attribute_type = 'Tensor6'
+    case (9)
+      attribute_type = 'Tensor'
+    case default
+      error stop "[h5fortran/visualization] ncomp must be 1, 3, 6, or 9"
+    end select
 
-  ! --------------------------------------------------------------------
-  ! add_point_attr_2d: ベクトル / テンソル点属性を登録
-  ! --------------------------------------------------------------------
-  subroutine phdf5_xdmf_add_point_2d(self, ncomp, field_name)
-    class(t_phdf5_writer), intent(inout) :: self
-    integer,          intent(in) :: ncomp
-    character(len=*), intent(in) :: field_name
+    call h5dopen_f(gid, trim(field_name), did, hdferr)
+    if (hdferr /= 0) error stop "[h5fortran/visualization] cannot open field dataset"
+    call write_string_attribute_(did, 'attribute_type', trim(attribute_type))
+    call h5dclose_f(did, hdferr)
+  end subroutine write_field_metadata_
 
-    call register_attribute_(self, field_name, 'Node', 'Float', 8, self%total_points, ncomp, .false.)
-  end subroutine phdf5_xdmf_add_point_2d
+  subroutine write_string_attribute_(obj_id, name, value)
+    integer(HID_T), intent(in) :: obj_id
+    character(len=*), intent(in) :: name, value
+    integer(HID_T) :: aid, sid, tid
+    integer(HSIZE_T) :: dims(1)
+    integer(SIZE_T) :: value_len
+    integer :: hdferr
 
-  ! --------------------------------------------------------------------
-  ! add_cell_attr_i32: int32 スカラーセル属性を登録
-  ! --------------------------------------------------------------------
-  subroutine phdf5_xdmf_add_cell_i32(self, field_name)
-    class(t_phdf5_writer), intent(inout) :: self
-    character(len=*), intent(in) :: field_name
+    dims = [1_HSIZE_T]
+    value_len = max(1_SIZE_T, int(len_trim(value), SIZE_T))
+    call h5tcopy_f(H5T_FORTRAN_S1, tid, hdferr)
+    call h5tset_size_f(tid, value_len, hdferr)
+    call h5screate_f(H5S_SCALAR_F, sid, hdferr)
+    call h5acreate_f(obj_id, trim(name), tid, sid, aid, hdferr)
+    call h5awrite_f(aid, tid, value, dims, hdferr)
+    call h5aclose_f(aid, hdferr)
+    call h5sclose_f(sid, hdferr)
+    call h5tclose_f(tid, hdferr)
+  end subroutine write_string_attribute_
 
-    call register_attribute_(self, field_name, 'Cell', 'Int', 4, self%total_cells, 1, .false.)
-  end subroutine phdf5_xdmf_add_cell_i32
+  subroutine write_int32_attribute_(obj_id, name, value)
+    integer(HID_T), intent(in) :: obj_id
+    character(len=*), intent(in) :: name
+    integer(int32), intent(in) :: value
+    integer(HID_T) :: aid, sid, tid
+    integer(HSIZE_T) :: dims(1)
+    integer :: hdferr
 
-  ! --------------------------------------------------------------------
-  ! write_fragment: .xdmf.part ファイルを直接書く（rank 0 のみ呼ぶ）
-  !
-  ! グローバル dataset を直接参照する。
-  ! Topology, Geometry, Attribute のみを含む（Grid タグは output_xdmf が付与）。
-  ! --------------------------------------------------------------------
-  subroutine phdf5_xdmf_write_fragment(self)
-    class(t_phdf5_writer), intent(in) :: self
-    character(len=512) :: part_path, h5_rel_path, group_prefix
-    character(len=30) :: time_str
-    integer :: fid, i
+    dims = [1_HSIZE_T]
+    tid = h5kind_to_type(int32, H5_INTEGER_KIND)
+    call h5screate_f(H5S_SCALAR_F, sid, hdferr)
+    call h5acreate_f(obj_id, trim(name), tid, sid, aid, hdferr)
+    call h5awrite_f(aid, tid, value, dims, hdferr)
+    call h5aclose_f(aid, hdferr)
+    call h5sclose_f(sid, hdferr)
+  end subroutine write_int32_attribute_
 
-    ! File path and name for .xdmf.part: e.g., 'metadata/seq00000_ugrid_phdf5.xdmf.part'
-    write(part_path,'(a,a,a,a,a,a)') &
-      trim(self%metadata_dir), '/seq', trim(int_fmt_(self%seq, self%seq_digits)), '_', &
-      trim(self%output_type), '_phdf5.xdmf.part'
+  subroutine write_real64_attribute_(obj_id, name, value)
+    integer(HID_T), intent(in) :: obj_id
+    character(len=*), intent(in) :: name
+    real(real64), intent(in) :: value
+    integer(HID_T) :: aid, sid, tid
+    integer(HSIZE_T) :: dims(1)
+    integer :: hdferr
 
-    ! Relative path from .xdmf.part to .h5: e.g., '../phdf5/seq00000.h5'
-    h5_rel_path = trim(self%rel_dir_meta2h5) // '/' // trim(self%h5_filename)
+    dims = [1_HSIZE_T]
+    tid = h5kind_to_type(real64, H5_REAL_KIND)
+    call h5screate_f(H5S_SCALAR_F, sid, hdferr)
+    call h5acreate_f(obj_id, trim(name), tid, sid, aid, hdferr)
+    call h5awrite_f(aid, tid, value, dims, hdferr)
+    call h5aclose_f(aid, hdferr)
+    call h5sclose_f(sid, hdferr)
+  end subroutine write_real64_attribute_
 
-    ! Group prefix for datasets: e.g., 'ugrid' or 'polydata'
-    group_prefix = trim(self%output_type)
-
-    open(newunit=fid, file=trim(part_path), status='replace', action='write')
-
-    write(time_str, '(es22.15e2)') self%time
-    write(fid,'(a,a,a)') '<Time Value="', trim(time_str), '"/>'
-
-    ! FIXME: Precision を判定する
-    ! FIXME: TopologyType を Mixed などに対応する
-    ! Topology
-    if (trim(self%output_type) == 'ugrid') then
-      write(fid,'(a,i0,a)')    '<Topology TopologyType="Hexahedron" NumberOfElements="', self%total_cells, '">'
-      write(fid,'(a,i0,a,i0,a)') '  <DataItem Format="HDF" NumberType="Int" Precision="', &
-        self%topology_precision, '" Dimensions="', self%total_cells, ' 8">'
-      write(fid,'(a,a,a,a,a)') '    ', trim(h5_rel_path), ':/', trim(group_prefix), '/geometry/connectivity'
-      write(fid,'(a)')         '  </DataItem>'
-      write(fid,'(a)')         '</Topology>'
-    else
-      write(fid,'(a,i0,a)')    '<Topology TopologyType="Polyvertex" NumberOfElements="', self%total_points, '" NodesPerElement="1"/>'
-    end if
-
-    ! FIXME: Precision を判定する
-    ! Geometry
-    write(fid,'(a)')         '<Geometry GeometryType="XYZ">'
-    write(fid,'(a,i0,a,i0,a)') '  <DataItem Format="HDF" NumberType="Float" Precision="', &
-      self%geometry_precision, '" Dimensions="', self%total_points, ' 3">'
-    write(fid,'(a,a,a,a,a)') '    ', trim(h5_rel_path), ':/', trim(group_prefix), '/geometry/nodes'
-    write(fid,'(a)')         '  </DataItem>'
-    write(fid,'(a)')         '</Geometry>'
-
-    ! Attributes
-    do i = 1, self%n_attrs
-      call attr_(self%attrs(i))
-    end do
-
-    close(fid)
-  contains
-    ! --------------------------------------------------------------------
-    ! int_fmt_: 整数を指定桁数でゼロ埋めした文字列に変換する内部ヘルパー
-    ! 例: int_fmt_(42, 4) -> '0042'
-    ! --------------------------------------------------------------------
-    function int_fmt_(val, digits) result(s)
-      integer, intent(in) :: val, digits
-      character(len=32) :: s, fmt
-      write(fmt,'(a,i0,a,i0,a)') '(i', max(digits, 20), '.', digits, ')'
-      write(s, fmt) val
-      s = adjustl(s)
-    end function int_fmt_
-
-    subroutine attr_(attr)
-      type(t_phdf5_attr_info), intent(in) :: attr
-      character(len=32) :: data_group
-
-      if (trim(attr%center) == 'Node') then
-        data_group = 'point_data'
-      else
-        data_group = 'cell_data'
-      end if
-
-      write(fid,'(a,a,a,a,a,a,a)') '<Attribute Name="', trim(attr%name), &
-        '" AttributeType="', trim(attr%attr_type), '" Center="', trim(attr%center), '">'
-
-      if (attr%ncomp == 1) then
-        write(fid,'(a,a,a,i0,a,i0,a)') &
-          '  <DataItem Format="HDF" NumberType="', trim(attr%num_type), &
-          '" Precision="', attr%precision, '" Dimensions="', attr%n_total, '">'
-      else
-        write(fid,'(a,a,a,i0,a,i0,a,i0,a)') &
-          '  <DataItem Format="HDF" NumberType="', trim(attr%num_type), &
-          '" Precision="', attr%precision, '" Dimensions="', attr%n_total, &
-          ' ', attr%ncomp, '">'
-      end if
-
-      write(fid,'(a,a,a,a,a,a,a)') '    ', trim(h5_rel_path), ':/', &
-        trim(group_prefix), '/', trim(data_group), '/' // trim(attr%name)
-      write(fid,'(a)') '  </DataItem>'
-      write(fid,'(a)') '</Attribute>'
-    end subroutine attr_
-  end subroutine phdf5_xdmf_write_fragment
-
-end module h5fort_parallel_hdf5_xdmf
+end module h5fort_parallel_visualization

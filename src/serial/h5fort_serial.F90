@@ -2,7 +2,7 @@
 ! To regenerate: src/fypp/generate_fypp.sh
 
 !==============================================================================
-! Module: h5fort_serial_write
+! Module: h5fort_serial
 !
 ! 概要:
 !   HDF5ファイルへのデータセット読み書きを行う汎用手続きを提供するモジュール。
@@ -10,9 +10,8 @@
 !
 !   対応する配列ランク: scalar, 1D, 2D, 3D, 4D (allocatable および固定長)
 !   対応する型        : real(real64), real(real32), integer(int32), logical (int32で保存), character (スカラーのみ)
-!   属性の書き込み   : hdf5_write_attr(file_id, path, [t_hdf5_attr("name","val"), ...], hdferr)
-!                      hdf5_write の attrs=[ ... ] optional 引数でも同時指定可
-!                      hdf5_write の units="..." optional 引数で単位を直接指定可
+!   属性の読み書き   : write_attribute / read_attribute
+!                      write の attrs=[ ... ] / units="..." でも同時指定可
 !
 ! 使用例 (OOP):
 !   type(t_h5fort_serial) :: h5
@@ -25,6 +24,7 @@
 !   HDF5 Fortran API (hdf5モジュール), iso_fortran_env
 !==============================================================================
 module h5fort_serial
+  use h5fort_serial_attribute
   use h5fort_serial_write
   use h5fort_serial_read
   use h5fort_serial_read_fixed
@@ -37,6 +37,8 @@ module h5fort_serial
   public :: h5fort_sread
   public :: h5fort_sread_fixed
   public :: h5fort_swrite_attr
+  public :: h5fort_write_attribute
+  public :: h5fort_read_attribute
 
   public :: t_hdf5_attr
   public :: t_h5fort_serial
@@ -74,6 +76,8 @@ module h5fort_serial
   contains
     procedure :: open  => h5fort_serial_open
     procedure :: close => h5fort_serial_close
+    procedure :: write_attribute => h5fort_serial_write_attribute
+    procedure :: read_attribute  => h5fort_serial_read_attribute
     ! write PASS wrappers
     procedure, private :: write_r64_0d => h5fort_serial_write_r64_0d
     procedure, private :: write_r64_1d => h5fort_serial_write_r64_1d
@@ -200,6 +204,25 @@ module h5fort_serial
 
 
 contains
+
+  !============================================================================
+  ! attribute PASS wrappers — character scalar
+  !============================================================================
+  subroutine h5fort_serial_write_attribute(self, obj_path, name, value)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*), intent(in) :: obj_path
+    character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: value
+    call h5fort_write_attribute(self%file_id, obj_path, name, value, self%hdferr)
+  end subroutine h5fort_serial_write_attribute
+
+  subroutine h5fort_serial_read_attribute(self, obj_path, name, value)
+    class(t_h5fort_serial),        intent(inout) :: self
+    character(len=*),              intent(in)    :: obj_path
+    character(len=*),              intent(in)    :: name
+    character(len=:), allocatable, intent(out)   :: value
+    call h5fort_read_attribute(self%file_id, obj_path, name, value, self%hdferr)
+  end subroutine h5fort_serial_read_attribute
 
   !============================================================================
   ! open: ファイルを開く

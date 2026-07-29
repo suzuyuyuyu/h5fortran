@@ -41,6 +41,7 @@ if [ "${check}" = true ]; then
 fi
 
 generate serial/h5fort_serial.fypp serial/h5fort_serial.F90
+generate serial/h5fort_serial_attribute.fypp serial/h5fort_serial_attribute.F90
 generate serial/h5fort_serial_read.fypp serial/h5fort_serial_read.F90
 generate serial/h5fort_serial_read_fixed.fypp serial/h5fort_serial_read_fixed.F90
 generate serial/h5fort_serial_write.fypp serial/h5fort_serial_write.F90
@@ -48,7 +49,7 @@ generate parallel/h5fort_parallel.fypp parallel/h5fort_parallel.F90
 generate parallel/h5fort_parallel_read.fypp parallel/h5fort_parallel_read.F90
 generate parallel/h5fort_parallel_read_fixed.fypp parallel/h5fort_parallel_read_fixed.F90
 generate parallel/h5fort_parallel_write.fypp parallel/h5fort_parallel_write.F90
-generate h5xdmf/h5fort_h5xdmf_parallel.fypp parallel/h5fort_parallel_hdf5_xdmf.F90
+generate parallel/h5fort_parallel_visualization.fypp parallel/h5fort_parallel_visualization.F90
 
 if [ "${check}" = true ]; then
   echo "Generated Fortran sources are up to date ($("${fypp_bin}" --version))."

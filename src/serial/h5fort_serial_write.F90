@@ -3,13 +3,12 @@
 
 #include "h5fort_serial.inc"
 module h5fort_serial_write
+  use h5fort_serial_attribute, only: t_hdf5_attr, h5fort_swrite_attr, h5fort_write_attribute
   use hdf5
   use,intrinsic :: iso_fortran_env
   implicit none
   private
 
-  public :: t_hdf5_attr
-  public :: h5fort_swrite_attr
   public :: H5FORTRAN_FORCE_WRITE
   public :: H5FORTRAN_READ_ONLY
 
@@ -34,14 +33,6 @@ module h5fort_serial_write
   public :: h5fort_write_lgc_2d
   public :: h5fort_write_lgc_3d
   public :: h5fort_write_lgc_4d
-
-  integer, parameter :: ATTR_NAME_LEN  = 64
-  integer, parameter :: ATTR_VALUE_LEN = 256
-
-  type :: t_hdf5_attr
-    character(len=ATTR_NAME_LEN)  :: name  = ""
-    character(len=ATTR_VALUE_LEN) :: value = ""
-  end type t_hdf5_attr
 
   integer, parameter :: H5FORTRAN_FORCE_WRITE = 1
   integer, parameter :: H5FORTRAN_READ_ONLY = 2
@@ -109,96 +100,6 @@ contains
     call h5sclose_f(space_id, err_local)
     call record_error(hdferr, err_local)
   end subroutine get_dataset_info
-
-  !----------------------------------------------------------------------------
-  ! write_units_attr: "units" 属性を1件書き込む内部ヘルパー
-  !----------------------------------------------------------------------------
-  subroutine write_units_attr(file_id, dset_path, units, hdferr)
-    integer(hid_t),   intent(in)  :: file_id
-    character(len=*), intent(in)  :: dset_path
-    character(len=*), intent(in)  :: units
-    integer,          intent(out) :: hdferr
-    type(t_hdf5_attr) :: a(1)
-    a(1)%name  = "units"
-    a(1)%value = units
-    call h5fort_swrite_attr(file_id, dset_path, a, hdferr)
-  end subroutine write_units_attr
-
-  !============================================================================
-  ! h5fort_swrite_attr: データセット/グループに文字列 attribute を付与する
-  !============================================================================
-  subroutine h5fort_swrite_attr(file_id, obj_path, attrs, hdferr)
-    integer(hid_t),    intent(in)  :: file_id
-    character(len=*),  intent(in)  :: obj_path
-    type(t_hdf5_attr), intent(in)  :: attrs(:)
-    integer,           intent(out) :: hdferr
-
-    integer(hid_t)  :: obj_id, attr_id, str_type_id, space_id
-    integer(hsize_t):: dims(1)
-    integer(size_t) :: str_len
-    integer         :: i, err_local
-    logical         :: attr_exists
-
-    dims   = [1_hsize_t]
-    hdferr = 0
-
-    call h5oopen_f(file_id, trim(obj_path), obj_id, hdferr)
-    if (hdferr /= 0) then
-      write(error_unit,'(A,A)') "[h5fort_serial_write] ERROR: h5oopen_f failed for: ", trim(obj_path)
-      return
-    end if
-
-    do i = 1, size(attrs)
-      if (len_trim(attrs(i)%name) == 0) cycle
-
-      call h5tcopy_f(H5T_FORTRAN_S1, str_type_id, err_local)
-      call record_error(hdferr, err_local)
-      if (err_local /= 0) cycle
-      str_len = max(1_size_t, int(len_trim(attrs(i)%value), size_t))
-      call h5tset_size_f(str_type_id, str_len, err_local)
-      call record_error(hdferr, err_local)
-      if (err_local /= 0) then
-        call h5tclose_f(str_type_id, err_local)
-        call record_error(hdferr, err_local)
-        cycle
-      end if
-
-      call h5screate_f(H5S_SCALAR_F, space_id, err_local)
-      call record_error(hdferr, err_local)
-      if (err_local /= 0) then
-        call h5tclose_f(str_type_id, err_local)
-        call record_error(hdferr, err_local)
-        cycle
-      end if
-
-      call h5aexists_f(obj_id, trim(attrs(i)%name), attr_exists, err_local)
-      call record_error(hdferr, err_local)
-      if (err_local == 0 .and. attr_exists) then
-        call h5adelete_f(obj_id, trim(attrs(i)%name), err_local)
-        call record_error(hdferr, err_local)
-      end if
-
-      if (err_local == 0) call h5acreate_f(obj_id, trim(attrs(i)%name), str_type_id, space_id, attr_id, err_local)
-      if (err_local /= 0) then
-        write(error_unit,'(A,A)') "[h5fort_serial_write] ERROR: h5acreate_f failed for attr: ", &
-                          trim(attrs(i)%name)
-        if (hdferr == 0) hdferr = err_local
-      else
-        call h5awrite_f(attr_id, str_type_id, attrs(i)%value, dims, err_local)
-        call record_error(hdferr, err_local)
-        call h5aclose_f(attr_id, err_local)
-        call record_error(hdferr, err_local)
-      end if
-
-      call h5sclose_f(space_id, err_local)
-      call record_error(hdferr, err_local)
-      call h5tclose_f(str_type_id, err_local)
-      call record_error(hdferr, err_local)
-    end do
-
-    call h5oclose_f(obj_id, err_local)
-    call record_error(hdferr, err_local)
-  end subroutine h5fort_swrite_attr
 
   !============================================================================
   ! 内部ユーティリティ: 中間グループ自動生成付きでデータセットを作成する
@@ -316,7 +217,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_r64_0d
@@ -344,7 +245,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_r32_0d
@@ -372,7 +273,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_i32_0d
@@ -404,7 +305,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_r64_1d
@@ -432,7 +333,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_r64_2d
@@ -460,7 +361,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_r64_3d
@@ -488,7 +389,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_r64_4d
@@ -516,7 +417,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_r32_1d
@@ -544,7 +445,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_r32_2d
@@ -572,7 +473,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_r32_3d
@@ -600,7 +501,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_r32_4d
@@ -628,7 +529,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_i32_1d
@@ -656,7 +557,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_i32_2d
@@ -684,7 +585,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_i32_3d
@@ -712,7 +613,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_i32_4d
@@ -787,7 +688,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_str_0d
@@ -820,7 +721,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_lgc_0d
@@ -854,7 +755,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_lgc_1d
@@ -885,7 +786,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_lgc_2d
@@ -916,7 +817,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_lgc_3d
@@ -947,7 +848,7 @@ contains
       call record_error(hdferr, err_local)
     end if
     if (present(units)) then
-      call write_units_attr(file_id, dset_path, units, err_local)
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_lgc_4d

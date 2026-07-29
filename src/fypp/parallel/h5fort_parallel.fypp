@@ -64,7 +64,7 @@ module h5fort_parallel
   use h5fort_parallel_write
   use h5fort_parallel_read
   use h5fort_parallel_read_fixed
-  use h5fort_parallel_hdf5_xdmf
+  use h5fort_parallel_visualization
   use hdf5
   use mpi
   use, intrinsic :: iso_fortran_env

@@ -32,6 +32,15 @@ call file%close()
 
 `write` は中間 group を自動作成します。既存 dataset を置き換える場合は `mode=H5FORTRAN_FORCE_WRITE` を渡します。`attrs` には `t_hdf5_attr` の配列、`units` には文字列を指定できます。
 
+文字列 attribute は dataset の書き込みとは独立して読み書きできます。対象 path には dataset、group、root group を指定できます。
+
+```fortran
+character(len=:), allocatable :: description
+
+call file%write_attribute("/result/value", "description", "flow velocity")
+call file%read_attribute("/result/value", "description", description)
+```
+
 固定サイズ配列へ読むときは `read_fixed` を使います。dataset と shape が違う場合は `hdferr` が非ゼロになります。logical 配列も利用できます。
 
 ```fortran
@@ -47,6 +56,8 @@ call file%read_fixed("/flags", flags)
 call h5fort_swrite(file_id, "/value", values, hdferr)
 call h5fort_sread(file_id, "/value", restored, hdferr)
 call h5fort_sread_fixed(file_id, "/flags", flags, hdferr)
+call h5fort_write_attribute(file_id, "/value", "units", "m/s", hdferr)
+call h5fort_read_attribute(file_id, "/value", "units", units, hdferr)
 ```
 
 ## Parallel: OOP API
@@ -87,3 +98,7 @@ call MPI_Finalize(ierr)
 ```
 
 詳細な型・rank とエラー契約は [SPEC.md](SPEC.md) を参照してください。
+
+可視化用のParallel HDF5 writerとPythonポストプロセスは
+[USAGE-visualization.md](USAGE-visualization.md)、
+出力ファイルとmanifestの責務は [POSTPROCESS.md](POSTPROCESS.md) を参照してください。

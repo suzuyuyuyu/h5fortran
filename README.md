@@ -38,6 +38,14 @@ target_link_libraries(my_program PRIVATE h5fortran::h5fortran)
 
 最短の利用例は [Serial example](example/small-serial.F90) と [Parallel example](example/small-parallel.F90)、API の詳細は [docs/USAGE.md](docs/USAGE.md) を参照してください。
 
+可視化用HDF5のレイアウトと、HDF5時系列からXDMF3を生成するPythonツールは
+[docs/USAGE-visualization.md](docs/USAGE-visualization.md) と
+[`postprocess`](postprocess/) を参照してください。
+snapshot、manifest、XDMFの責務は
+[docs/POSTPROCESS.md](docs/POSTPROCESS.md) にまとめています。
+完成した出力構成を生成する例は
+[`example/visualization`](example/visualization/) にあります。
+
 ## fypp 生成
 
 型・rank 別の Fortran ソースは `src/fypp/` を正とします。

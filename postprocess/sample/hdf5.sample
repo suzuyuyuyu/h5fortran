@@ -1,0 +1,11 @@
+/
+/scheme_ver = 1
+/ugrid/geometry/connectivity = "/ugrid/geometry/connectivity"
+/ugrid/geometry/nodes_coord = "/ugrid/geometry/nodes_coord"
+/ugrid/outputset = ["/ugrid/point_data/velocity", "/ugrid/point_data/pressure", "/ugrid/cell_data/procID"]
+/ugrid/types = ["point", "point", "cell"]
+/ugrid/time = [0.01, 0.02, 0.03, ..., 2.0]
+/polydata/geometry/points_coord = "/polydata/geometry/points_coord"
+/polydata/outputset = ["/polydata/point_data/stress", "/polydata/point_data/velocity"]
+/polydata/types = ["point", "point"]
+/polydata/time = [0.01, 0.02, 0.03, ..., 2.0]

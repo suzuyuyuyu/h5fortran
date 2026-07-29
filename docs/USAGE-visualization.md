@@ -1,17 +1,25 @@
-# Parallel HDF5 / XDMF 出力
+# 可視化用Parallel HDF5出力
 
-`t_phdf5_writer` は、全 MPI rank の mesh と属性を一つの HDF5 ファイルへ集合的に書き、ParaView などから参照する XDMF fragment を生成します。
+`t_phdf5_writer` は全MPI rankのmeshとfieldを一つのHDF5ファイルへ集合的に
+書きます。Fortran側ではXDMF/XMLを生成しません。HDF5時系列を出力した後、
+[`postprocess`](../postprocess/) でXDMF3を生成します。
 
-## 対応型
+snapshot HDF5を正本とし、`metadata.h5` はPythonが作る再生成可能な索引とする。
+ソルバーは `metadata.h5` へ追記しない。
 
-geometry の座標は `real(real32/real64/real128)`、connectivity は `integer(int8/int16/int32/int64)` に対応します。point/cell data は次のすべてについて 1D scalar と 2D vector/tensor を書けます。
+想定する完成形:
 
-- `integer(int8)`、`integer(int16)`、`integer(int32)`、`integer(int64)`
-- `real(real32)`、`real(real64)`、`real(real128)`
+```text
+result/
+├── seq000000.h5
+├── seq000001.h5
+├── ...
+├── metadata.h5
+├── fluid.xdmf
+└── soil_particles.xdmf
+```
 
-XDMF の `NumberType` と `Precision` は、書き込んだ Fortran kind から自動設定されます。従来の `add_point_attr` / `add_cell_attr` も互換性のため利用できますが、通常は明示的に呼ぶ必要はありません。
-
-## UnstructuredGrid
+## HDF5出力
 
 ```fortran
 use h5fort
@@ -24,54 +32,134 @@ integer(int64) :: connectivity(8, num_cells)
 real(real64) :: pressure(num_points)
 real(real64) :: velocity(3, num_points)
 
-writer%h5_filepath = 'phdf5/seq00000.h5'
-writer%h5_filename = 'seq00000.h5'
-writer%metadata_dir = 'metadata'
-writer%rel_dir_meta2h5 = '../phdf5'
+writer%h5_filepath = 'result/seq000000.h5'
 writer%output_type = 'UnstructuredGrid'
 writer%num_points = num_points
 writer%num_cells = num_cells
-writer%seq = 0
 writer%time = 0.0_real64
 
 call writer%init()
 call writer%write_geometry_ugrid(nodes, connectivity)
 call writer%write_point_data(pressure, 'Pressure')
 call writer%write_point_data(velocity, 'Velocity')
-if (rank == 0) call writer%write_fragment()
 call writer%close()
 ```
 
-`num_points` と `num_cells` は各 rank が所有する要素数です。ghost 要素は含めません。connectivity は呼び出し側でグローバル 0-origin node ID に変換して渡します。`init`、HDF5 write、`close` は全 rank が同じ順序で呼び、`write_fragment` は rank 0 のみが呼びます。
+`num_cells` は各rankが出力するowned cell数で、ghost cellは含めません。
+`num_points` はowned cellが参照する全local node数です。rank境界の共有・halo nodeは
+rankごとに別nodeとして重複して構いません。
 
-## PolyData
+connectivityは `nodes(:, :)` を参照するrank-local 0-origin node IDで渡します。
+writerがrankごとのnode offsetを加え、HDF5全体のIDへ変換します。呼び出し側で
+global node IDを計算するための通信は不要です。`init`、write、`close` は全rankが
+同じ順序で呼びます。
 
 ```fortran
-writer%output_type = 'PolyData'
+! nodes(:, 1:4) を参照するrank-local connectivity
+connectivity(:, 1) = [0_int64, 1_int64, 2_int64, 3_int64]
+call writer%write_geometry(nodes, connectivity)
+```
+
+共有nodeのfield値を一致させて可視化したい場合、必要に応じて出力前に通常のhalo
+exchangeを行います。これはnode番号を統合する通信ではなく、field値を同期するための
+通信です。
+
+重複nodeを結合したい場合はParaViewの `Clean to Grid` filterを利用できます。
+ghost cellまで出力するとcellが重複するため、出力対象はowned cellだけにします。
+
+PolyDataは `output_type='PolyData'`、`num_cells=0` として
+`write_geometry_polydata(nodes)` を呼びます。同じ `h5_filepath` に
+UnstructuredGrid、PolyDataの順で書くと、`/ugrid` と `/polydata` に保存されます。
+
+## Connectivity meshの一般形
+
+connectivityを持つmeshは、同じwriterで任意のXDMF topologyを扱えます。
+`mesh_name` はHDF5のroot直下group名です。
+
+```fortran
+writer%h5_filepath = 'result/seq000000.h5'
+writer%output_type = 'UnstructuredGrid'
+writer%mesh_name = 'tetra'
+writer%topology_type = 'Tetrahedron'
+writer%nodes_per_element = 4
 writer%num_points = num_points
-writer%num_cells = 0
+writer%num_cells = num_cells
+writer%time = time
+
 call writer%init()
-call writer%write_geometry_polydata(nodes)
+call writer%write_geometry(nodes, connectivity)
 call writer%write_point_data(pressure, 'Pressure')
-if (rank == 0) call writer%write_fragment()
 call writer%close()
 ```
 
-同じ `h5_filepath` に先に UnstructuredGrid、次に PolyData を書くと、それぞれ `/ugrid` と `/polydata` group として保存されます。
+代表的な指定は次のとおりです。
 
-## 現在の保存形式
+| 要素 | `topology_type` | `nodes_per_element` |
+|---|---|---:|
+| 六面体 | `Hexahedron` | 8 |
+| 四面体 | `Tetrahedron` | 4 |
+| 2D四角形 | `Quadrilateral` | 4 |
+| 三角形 | `Triangle` | 3 |
+
+`topology_type` と `nodes_per_element` は同時に指定します。省略した場合だけ
+`Hexahedron`、8が既定値になります。同じHDF5へ異なる `mesh_name` で順番に
+書き込むことで、複数種類のmeshを一つのtime stepに保存できます。
+
+## scheme_version=1
 
 ```text
-/ugrid/geometry/nodes
-/ugrid/geometry/connectivity
-/ugrid/point_data/<field-name>
-/ugrid/cell_data/<field-name>
-/polydata/geometry/nodes
-/polydata/point_data/<field-name>
+/                                      attrs: scheme_version=1, time=<float64>
+/<mesh>/                               attrs: topology_type, nodes_per_element
+/<mesh>/geometry/nodes                 (num_nodes, 3)
+/<mesh>/geometry/connectivity          (num_elements, npe), PolyDataでは省略
+/<mesh>/point_data/<field>             (num_nodes[, ncomp])
+/<mesh>/cell_data/<field>              (num_elements[, ncomp])
 ```
 
-Fortran の `data(ncomp, nlocal)` は、HDF5 上では `[global_n, ncomp]`、XDMF の `Dimensions` も `"global_n ncomp"` になります。現在は呼び出しごとに固定サイズ dataset を作成し、従来の XDMF fragment 形式を維持しています。
+2D fieldには `attribute_type=Vector|Tensor6|Tensor` 属性も書かれます。対応成分数は
+3、6、9です。1D fieldは `Scalar` です。
 
-## 将来の unlimited dataset 化
+geometryは `real(real32/real64/real128)`、connectivityは
+`integer(int8/int16/int32/int64)`、point/cell dataはこれら7 kindの1D/2Dに
+対応します。
 
-時系列 `misc` データを単一 dataset へ追記する設計は、`H5S_UNLIMITED`、chunk、hyperslab extend を使う別の保存方式として実装する予定です。今回の fypp 化ではその変更を先取りせず、現在のファイル構造と fragment 出力を維持しています。
+## XDMFの生成
+
+Python 3.10以上と `uv` を用意し、リポジトリrootから実行します。
+
+```sh
+cd postprocess
+uv sync
+uv run h5xdmf "../result/seq*.h5" \
+  --metadata ../result/metadata.h5 \
+  --outdir ../result
+```
+
+初回は各snapshotのmetadataだけを一度走査して `metadata.h5` を作ります。
+再実行時は未登録のsnapshotだけを追記します。XDMF生成はmanifestだけを読み、
+field本体やsnapshot HDF5を再走査しません。
+
+XDMFはmesh group名ごとに生成される。HDF5 groupを `/fluid` と
+`/soil_particles` にすると、`fluid.xdmf` と `soil_particles.xdmf` になる。
+field本体はXDMFへ複製されず、各 `seqNNNNNN.h5` のdatasetを参照する。
+
+`metadata.h5` のmesh別時系列構造と増分更新の詳細は
+[POSTPROCESS.md](POSTPROCESS.md) を参照してください。
+
+## 完成形のexample
+
+2 MPI rank、5 stepの流体・土粒子snapshot出力からポストプロセスまでを一括実行
+できます。流体は四面体mesh上の圧力波と渦速度、土粒子は沈降・拡散と応力を持つ。
+
+```sh
+example/visualization/generate.sh build
+```
+
+生成されるファイルと使い方は
+[`example/visualization/README.md`](../example/visualization/README.md) を参照してください。
+ParaViewでの色付け、Glyph、粒子表示の手順もexample READMEに記載している。
+
+必要な実行時ツールはPython 3.10以上、`h5py`、`numpy`です。依存関係と固定版は
+`pyproject.toml` と `uv.lock` で管理されています。生成XDMFの確認にはParaView、
+HDF5構造の手動確認には `h5dump` または `h5ls` が便利ですが、どちらも生成処理の
+必須依存ではありません。
