@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
-project(h5fortran
-  VERSION 0.1.0
-  DESCRIPTION "Fortran interface to HDF5"
-  LANGUAGES Fortran)
+project(
+    h5fortran
+    VERSION 1.0.0
+    DESCRIPTION "Fortran interface to HDF5"
+    LANGUAGES Fortran
+)
 
 include(CTest)
 include(GNUInstallDirs)
@@ -31,9 +33,12 @@ if(H5FORTRAN_ENABLE_PARALLEL)
 endif()
 
 add_library(h5fortran_hdf5 INTERFACE)
-target_link_libraries(h5fortran_hdf5 INTERFACE
-  hdf5::hdf5_fortran
-  hdf5::hdf5_hl_fortran)
+target_link_libraries(
+    h5fortran_hdf5
+    INTERFACE
+    hdf5::hdf5_fortran
+    hdf5::hdf5_hl_fortran
+)
 
 add_subdirectory(src)
 
