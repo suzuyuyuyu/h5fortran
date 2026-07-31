@@ -1,7 +1,16 @@
 set(H5FORTRAN_MODULE_DIRECTORY "${CMAKE_BINARY_DIR}/mod")
 file(MAKE_DIRECTORY "${H5FORTRAN_MODULE_DIRECTORY}")
 
-set(h5fortran_components h5fortran_hdf5)
+add_library(h5fortran_version
+  "${PROJECT_BINARY_DIR}/generated/h5fort_version.F90")
+target_include_directories(h5fortran_version
+  PUBLIC
+    "$<BUILD_INTERFACE:${H5FORTRAN_MODULE_DIRECTORY}>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/h5fortran>")
+set_target_properties(h5fortran_version PROPERTIES
+  Fortran_MODULE_DIRECTORY "${H5FORTRAN_MODULE_DIRECTORY}")
+
+set(h5fortran_components h5fortran_hdf5 h5fortran_version)
 
 if(H5FORTRAN_ENABLE_SERIAL)
   add_library(h5fortran_serial
@@ -29,7 +38,9 @@ if(H5FORTRAN_ENABLE_PARALLEL)
     parallel/h5fort_parallel_read_fixed.F90
     parallel/h5fort_parallel_visualization.F90
     parallel/h5fort_parallel.F90)
-  target_link_libraries(h5fortran_parallel PUBLIC h5fortran_hdf5 MPI::MPI_Fortran)
+  target_link_libraries(
+    h5fortran_parallel PUBLIC
+    h5fortran_hdf5 h5fortran_version MPI::MPI_Fortran)
   target_include_directories(h5fortran_parallel
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/parallel"
     PUBLIC

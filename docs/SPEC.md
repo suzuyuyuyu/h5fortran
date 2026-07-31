@@ -1,5 +1,28 @@
 # h5fortran 仕様
 
+## バージョン管理
+
+`h5fortran`と`h5xdmf`は同じリポジトリから同時にリリースし、共通のSemVerを使う。
+製品バージョンの正本は`postprocess/src/h5xdmf/_version.py`の`__version__`とする。
+CMakeは`cmake/h5fortranVersion.cmake`を介してこの値を読み、Python packageは
+Hatchlingのdynamic versionとして同じ値を読む。`uv.lock`は正本から更新される
+生成物である。
+
+HDF5 root属性の`scheme_version`は製品バージョンのmajorと常に一致させる。
+製品`1.x.y`はscheme 1を読み書きし、HDF5内部レイアウトに非互換変更がある場合は
+製品を`2.0.0`、schemeを2へ同時に更新する。patch/minor更新ではHDF5 schemaの
+後方互換性を維持する。Pythonは製品majorから現在のschemeを決定する。CMakeは
+`h5fort_version` moduleを生成し、Fortran writerと利用者へ次を公開する。
+
+- `H5FORTRAN_VERSION`: 製品の完全なSemVer文字列
+- `H5FORTRAN_VERSION_MAJOR`: 製品major
+- `H5FORTRAN_SCHEME_VERSION`: 現在書き出すscheme。製品majorと同値
+
+readerは現在の製品majorを決め打ちせず、入力HDF5の`scheme_version`を読んで登録済み
+scheme実装を選ぶ。これによりmajor更新後も、対応する旧scheme readerを残す限り古い
+HDF5を読める。XDMFの`Version="3.0"`は外部規格の版であり、製品バージョンとは
+独立している。
+
 ## 公開 API
 
 | API | Serial | Parallel |
@@ -84,6 +107,9 @@ rank-local 0-origin IDとし、writerがrankごとのnode offsetを加えてHDF5
 ghost cellは重複cellになるため出力しない。
 
 XDMF3は `postprocess` がHDF5 metadataを読み、ポストプロセスとして生成する。
+時系列中に空stepがあるmeshについては、XDMFの各stepをSpatial Collectionで包み、
+非空stepだけにUniform Gridを置く。空stepからゼロサイズHDF5 DataItemを参照しない。
+これはXDMF表現上の互換対策であり、HDF5 schemaや粒子数を変更しない。
 
 各snapshot内のdatasetは固定サイズとする。step間ではnode数、element数、粒子数が
 変化してよい。ソルバーは中央の `metadata.h5` へ追記せず、Python indexerが

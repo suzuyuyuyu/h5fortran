@@ -1,6 +1,8 @@
 #include "h5fort_config.inc"
 module h5fort
 
+  use h5fort_version, only: H5FORTRAN_VERSION, H5FORTRAN_VERSION_MAJOR, &
+    H5FORTRAN_SCHEME_VERSION
 #ifdef H5FORTRAN_PARALLEL
   use h5fort_parallel, H5FORTRAN_FORCE_WRITE_PARALLEL => H5FORTRAN_FORCE_WRITE, &
     H5FORTRAN_READ_ONLY_PARALLEL => H5FORTRAN_READ_ONLY
@@ -21,6 +23,8 @@ module h5fort
 
   integer, parameter, public :: H5FORTRAN_FORCE_WRITE = 1
   integer, parameter, public :: H5FORTRAN_READ_ONLY = 2
+  public :: H5FORTRAN_VERSION, H5FORTRAN_VERSION_MAJOR
+  public :: H5FORTRAN_SCHEME_VERSION
 
 #ifdef H5FORTRAN_PARALLEL
   public :: h5fort_pwrite, h5fort_pread, h5fort_pread_fixed

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from xml.etree import ElementTree
+
 import pytest
 import h5py
 
@@ -81,6 +83,47 @@ def test_xdmf_from_manifest_only(tmp_path):
     pv = (out / "polydata.xdmf").read_text()
     assert 'TopologyType="Polyvertex"' in pv
     assert "<Topology" in pv and "NodesPerElement" in pv
+
+
+@pytest.mark.parametrize("particle_counts", ([1, 0, 1], [0, 0, 0]))
+def test_empty_particle_steps_use_empty_spatial_collections(tmp_path, particle_counts):
+    phdf5 = tmp_path / "phdf5"
+    phdf5.mkdir()
+    paths = []
+    for step, count in enumerate(particle_counts):
+        snapshot = sample.make_snapshot(
+            float(step), ncells=(2, 2, 2), nparticles=count, seed=step
+        )
+        path = phdf5 / f"seq{step:05d}.h5"
+        write_snapshot(str(path), snapshot)
+        paths.append(str(path))
+
+    manifest = build_manifest(paths, relative_to=str(tmp_path))
+    out = tmp_path / "xdmf"
+    build_xdmf_files(manifest, str(out), manifest_dir=str(tmp_path))
+
+    polydata_path = out / "polydata.xdmf"
+    root = ElementTree.parse(polydata_path).getroot()
+    temporal = root.find("./Domain/Grid")
+    assert temporal is not None
+    steps = temporal.findall("Grid")
+    assert len(steps) == len(particle_counts)
+
+    for step, (grid, count) in enumerate(zip(steps, particle_counts)):
+        assert grid.attrib["GridType"] == "Collection"
+        assert grid.attrib["CollectionType"] == "Spatial"
+        assert grid.find("Time").attrib["Value"] == f"{float(step):.15E}"
+        children = grid.findall("Grid")
+        assert len(children) == (1 if count else 0)
+        if children:
+            assert children[0].attrib["GridType"] == "Uniform"
+            assert children[0].find("Time") is None
+
+    xml = polydata_path.read_text()
+    assert 'Dimensions="0' not in xml
+    for step, count in enumerate(particle_counts):
+        reference = f"seq{step:05d}.h5:/polydata/"
+        assert (reference in xml) is bool(count)
 
 
 def _summary(manifest):

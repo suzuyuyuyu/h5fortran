@@ -158,6 +158,11 @@ XDMFはmesh group名ごとに生成される。HDF5 groupを `/fluid` と
 `/soil_particles` にすると、`fluid.xdmf` と `soil_particles.xdmf` になる。
 field本体はXDMFへ複製されず、各 `seqNNNNNN.h5` のdatasetを参照する。
 
+粒子数が途中で0になる場合もHDF5には0件のdatasetをそのまま保存する。生成XDMFでは
+空stepを子GridのないSpatial Collectionとして表し、ゼロサイズdatasetを参照しない。
+非空stepでは通常のUniform GridがSpatial Collectionの子になる。全stepが非空のmesh
+は従来どおりUniform Gridの時系列として出力される。
+
 `metadata.h5` のmesh別時系列構造と増分更新の詳細は
 [POSTPROCESS.md](POSTPROCESS.md) を参照してください。
 

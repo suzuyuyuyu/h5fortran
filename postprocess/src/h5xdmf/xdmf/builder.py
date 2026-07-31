@@ -44,24 +44,74 @@ def _build_mesh_xml(
 ) -> str:
     lines = [_HEADER, "  <Domain>\n"]
     lines.append('    <Grid Name="TimeSeries" GridType="Collection" CollectionType="Temporal">\n')
+    use_spatial_steps = any(_is_empty(record) for record in records)
     for record in records:
         step = record.step_index
-        lines.append(
+        if use_spatial_steps:
+            lines.append(
+                _spatial_step(
+                    name=f"step{step:05d}",
+                    time=manifest.times[step],
+                    rel_file=manifest.files[step],
+                    record=record,
+                    schema=schema,
+                    scheme=scheme,
+                    outdir=outdir,
+                    manifest_dir=manifest_dir,
+                )
+            )
+        else:
+            lines.append(
+                _uniform_grid(
+                    name=f"step{step:05d}",
+                    time=manifest.times[step],
+                    rel_file=manifest.files[step],
+                    record=record,
+                    schema=schema,
+                    scheme=scheme,
+                    outdir=outdir,
+                    manifest_dir=manifest_dir,
+                )
+            )
+    lines.append("    </Grid>\n")
+    lines.append("  </Domain>\n")
+    lines.append(_FOOTER)
+    return "".join(lines)
+
+
+def _spatial_step(
+    *,
+    name: str,
+    time: float,
+    rel_file: str,
+    record: MeshRecord,
+    schema: MeshSchema,
+    scheme,
+    outdir: str,
+    manifest_dir: str,
+) -> str:
+    pad = "      "
+    out = [
+        f'{pad}<Grid Name="{name}" GridType="Collection" CollectionType="Spatial">\n',
+        f'{pad}  <Time Value="{_fmt_time(time)}"/>\n',
+    ]
+    if not _is_empty(record):
+        out.append(
             _uniform_grid(
-                name=f"step{step:05d}",
-                time=manifest.times[step],
-                rel_file=manifest.files[step],
+                name=schema.name,
+                time=time,
+                rel_file=rel_file,
                 record=record,
                 schema=schema,
                 scheme=scheme,
                 outdir=outdir,
                 manifest_dir=manifest_dir,
+                pad=f"{pad}  ",
+                include_time=False,
             )
         )
-    lines.append("    </Grid>\n")
-    lines.append("  </Domain>\n")
-    lines.append(_FOOTER)
-    return "".join(lines)
+    out.append(f"{pad}</Grid>\n")
+    return "".join(out)
 
 
 def _uniform_grid(
@@ -74,12 +124,15 @@ def _uniform_grid(
     scheme,
     outdir: str,
     manifest_dir: str,
+    pad: str = "      ",
+    include_time: bool = True,
 ) -> str:
-    pad = "      "
     ref = _ref(rel_file, manifest_dir, outdir)
     group = scheme.mesh_group_h5path(schema.name)
+    data_item_indent = len(pad) // 2 + 1
     out = [f'{pad}<Grid Name="{name}" GridType="Uniform">\n']
-    out.append(f'{pad}  <Time Value="{_fmt_time(time)}"/>\n')
+    if include_time:
+        out.append(f'{pad}  <Time Value="{_fmt_time(time)}"/>\n')
 
     if schema.has_connectivity:
         out.append(
@@ -91,7 +144,7 @@ def _uniform_grid(
                 f"{ref}:{scheme.connectivity_h5path(group)}",
                 schema.connectivity_dtype,
                 f"{record.num_elements} {schema.nodes_per_element}",
-                4,
+                data_item_indent,
             )
         )
         out.append(f"{pad}  </Topology>\n")
@@ -108,7 +161,7 @@ def _uniform_grid(
             f"{ref}:{scheme.nodes_h5path(group)}",
             schema.nodes_dtype,
             f"{record.num_nodes} 3",
-            4,
+            data_item_indent,
         )
     )
     out.append(f"{pad}  </Geometry>\n")
@@ -130,13 +183,17 @@ def _uniform_grid(
                 f"{ref}:{scheme.field_h5path(group, field_schema.center, field_schema.name)}",
                 field_schema.dtype,
                 dims,
-                4,
+                data_item_indent,
             )
         )
         out.append(f"{pad}  </Attribute>\n")
 
     out.append(f"{pad}</Grid>\n")
     return "".join(out)
+
+
+def _is_empty(record: MeshRecord) -> bool:
+    return record.num_nodes == 0 or record.num_elements == 0
 
 
 def _data_item(body: str, dtype, dims: str, indent: int) -> str:

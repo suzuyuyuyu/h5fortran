@@ -12,6 +12,7 @@ from .model import (
     Series,
     Snapshot,
 )
+from ._version import __version__
 
 __all__ = [
     "AttributeType",
@@ -21,5 +22,3 @@ __all__ = [
     "Snapshot",
     "Series",
 ]
-
-__version__ = "0.1.0"

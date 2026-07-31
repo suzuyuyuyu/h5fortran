@@ -4,6 +4,7 @@
 ! To regenerate: src/fypp/generate_fypp.sh
 
 module h5fort_parallel_visualization
+  use h5fort_version, only: H5FORTRAN_SCHEME_VERSION
   use hdf5
 ! # define USE_MPI_F08
 # ifdef USE_MPI_F08
@@ -311,7 +312,8 @@ contains
     end if
 
     if (.not. file_exists) then
-      call write_int32_attribute_(self%file_id, 'scheme_version', 1_int32)
+      call write_int32_attribute_(self%file_id, 'scheme_version', &
+                                 int(H5FORTRAN_SCHEME_VERSION, int32))
       call write_real64_attribute_(self%file_id, 'time', self%time)
     end if
 

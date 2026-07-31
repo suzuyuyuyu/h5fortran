@@ -1,5 +1,18 @@
 # h5fortran の使い方
 
+## 製品・HDF5 scheme version
+
+`use h5fort`により、製品と現在のHDF5出力schemeを参照できる。
+
+```fortran
+print *, H5FORTRAN_VERSION
+print *, H5FORTRAN_VERSION_MAJOR
+print *, H5FORTRAN_SCHEME_VERSION
+```
+
+`H5FORTRAN_SCHEME_VERSION`は製品majorと一致する。HDF5 readerはファイルrootの
+`scheme_version`属性を読み、対応するschemeを選ぶ。
+
 ## Serial: OOP API
 
 通常は `t_h5fort_serial` を使うと、HDF5 の file ID と直前のエラーがオブジェクト内にまとまります。

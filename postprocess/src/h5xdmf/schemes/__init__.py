@@ -6,12 +6,20 @@ Register a new output format by importing it here and adding it to
 
 from __future__ import annotations
 
+from .._version import __version__
 from .base import SCHEME_VERSION_ATTR, Scheme
 from .v1 import SchemeV1
+
+CURRENT_SCHEME_VERSION = int(__version__.split(".", maxsplit=1)[0])
 
 _REGISTRY: dict[int, Scheme] = {
     SchemeV1.version: SchemeV1(),
 }
+
+if CURRENT_SCHEME_VERSION not in _REGISTRY:
+    raise RuntimeError(
+        f"product major version {CURRENT_SCHEME_VERSION} has no registered HDF5 scheme"
+    )
 
 
 def get_scheme(version: int) -> Scheme:
@@ -28,4 +36,10 @@ def available_versions() -> list[int]:
     return sorted(_REGISTRY)
 
 
-__all__ = ["Scheme", "get_scheme", "available_versions", "SCHEME_VERSION_ATTR"]
+__all__ = [
+    "CURRENT_SCHEME_VERSION",
+    "Scheme",
+    "get_scheme",
+    "available_versions",
+    "SCHEME_VERSION_ATTR",
+]

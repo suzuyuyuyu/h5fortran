@@ -21,6 +21,8 @@ res*.txt
 stdout
 stderr
 log
+!/log/
+!/log/*.md
 *out*
 *err*
 

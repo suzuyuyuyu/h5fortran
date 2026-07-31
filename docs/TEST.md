@@ -32,7 +32,9 @@ uv run pytest
 ```
 
 対象はscheme v1のread/write、manifestの新規作成・増分更新、schema driftの拒否、
-XDMF生成、CLI、Tetrahedron・Quadrilateral・Triangleのmetadata roundtripである。
+XDMF生成、空粒子stepのSpatial Collection表現、CLI、
+Tetrahedron・Quadrilateral・Triangleのmetadata roundtrip、Python distributionと
+moduleのバージョン一致、製品majorとPython/Fortranのscheme version一致である。
 
 Fortranからポストプロセスまでの完成形は次で確認する。
 

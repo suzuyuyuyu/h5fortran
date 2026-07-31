@@ -124,6 +124,10 @@ MPI rankごとの配列はFortran writerがHDF5 dataset内で連結済みであ�
 - `xdmf.build_xdmf_files`: **mesh group名ごとに1つの `<name>.xdmf`** を出力
   （Temporal Collection）。標準例では `fluid.xdmf` と
   `soil_particles.xdmf` になる。参照パスは `.xdmf` の場所からの相対に変換する。
+- node数またはelement数が0のrecordを含むmeshは、全stepをSpatial Collectionで
+  包んで出力する。非空stepの子はUniform Grid 1個、空stepは子Grid 0個とする。
+  これにより出力データ型を時系列内で揃え、ゼロサイズHDF5 DataItemをXDMFから
+  参照しない。logical meshやmanifest schemaを空間分割へ拡張するものではない。
 
 ## ディレクトリ構成
 

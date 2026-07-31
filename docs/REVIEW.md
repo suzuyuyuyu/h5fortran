@@ -93,6 +93,7 @@ ghost cellは出力しない。重複nodeを結合する場合はParaViewの `Cl
 - 複数mesh groupと一般化topology
 - Python manifestの新規作成と増分更新
 - Python XDMF生成とCLI
+- 0粒子stepを含む時系列の空Spatial Collection表現
 - install後の外部consumer build
 - Fortran snapshotからXDMFまでのend-to-end example
 

@@ -24,6 +24,9 @@ uv run h5xdmf "phdf5/seq*.h5" --metadata metadata.h5 --outdir xdmf
 `--rebuild`、既存manifestからXDMFだけを再生成する場合は
 `--generate-only --metadata metadata.h5` を使います。
 
+粒子数などが0になるstepは、子Gridを持たないSpatial CollectionとしてXDMFへ
+出力される。HDF5の空datasetは保持されるが、XDMFからは参照しない。
+
 Python API:
 
 ```python

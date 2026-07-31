@@ -70,6 +70,12 @@ stepごとに変化できるもの:
 XDMFはfield値を複製せず、`seqNNNNNN.h5` 内のdatasetをHeavy Dataとして参照する。
 現在はmesh group名ごとに1つの時系列XDMFを生成する。
 
+時系列中にnode数またはelement数が0のstepがあるmeshは、各stepをSpatial
+Collectionで包む。非空stepにはUniform Gridを1つ置き、空stepは子Gridを持たない
+空のSpatial Collectionとする。これにより、粒子が消滅する時系列を正確に表現しつつ、
+ParaViewがゼロサイズHDF5 DataItemを時間更新時に再読込する経路を避ける。
+HDF5 snapshotと`metadata.h5`の粒子数は変更しない。
+
 標準的な物理区分は次の2つである。
 
 ```text

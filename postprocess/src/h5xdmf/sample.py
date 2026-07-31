@@ -14,6 +14,7 @@ import numpy as np
 
 from .model import AttributeType, Center, DataArray, MeshBlock, Snapshot
 from .hdf5.writer import write_snapshot
+from .schemes import CURRENT_SCHEME_VERSION
 
 
 def _hex_grid(ncells: tuple[int, int, int]) -> tuple[np.ndarray, np.ndarray]:
@@ -123,7 +124,7 @@ def make_snapshot(
     return Snapshot(
         time=time,
         source_file="",
-        scheme_version=1,
+        scheme_version=CURRENT_SCHEME_VERSION,
         mesh_blocks=[ugrid, polydata],
     )
 
@@ -135,7 +136,7 @@ def write_series(
     dt: float = 1.0e-5,
     ncells: tuple[int, int, int] = (20, 20, 20),
     nparticles: int = 100,
-    scheme_version: int = 1,
+    scheme_version: int = CURRENT_SCHEME_VERSION,
 ) -> list[str]:
     """Write ``nsteps`` files ``seqNNNNN.h5`` and return their paths."""
     os.makedirs(outdir, exist_ok=True)

@@ -1,10 +1,17 @@
 cmake_minimum_required(VERSION 3.20)
+include(cmake/h5fortranVersion.cmake)
 project(
     h5fortran
-    VERSION 1.0.0
+    VERSION "${H5FORTRAN_VERSION}"
     DESCRIPTION "Fortran interface to HDF5"
     LANGUAGES Fortran
 )
+
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated")
+configure_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/h5fort_version.F90.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/generated/h5fort_version.F90"
+  @ONLY)
 
 include(CTest)
 include(GNUInstallDirs)

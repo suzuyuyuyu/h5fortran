@@ -1,0 +1,9 @@
+module h5fort_version
+  implicit none
+  private
+
+  character(len=*), parameter, public :: H5FORTRAN_VERSION = "@PROJECT_VERSION@"
+  integer, parameter, public :: H5FORTRAN_VERSION_MAJOR = @PROJECT_VERSION_MAJOR@
+  integer, parameter, public :: H5FORTRAN_SCHEME_VERSION = H5FORTRAN_VERSION_MAJOR
+
+end module h5fort_version
