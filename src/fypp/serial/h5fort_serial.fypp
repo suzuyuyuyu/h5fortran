@@ -45,7 +45,7 @@
 !   中間グループはhdf5_writeが自動生成する。
 !
 !   対応する配列ランク: scalar, 1D, 2D, 3D, 4D (allocatable および固定長)
-!   対応する型        : real(real64), real(real32), integer(int32), logical (int32で保存), character (スカラーのみ)
+!   対応する型        : real(real64), real(real32), integer(int32/int64), logical (int32で保存), character (スカラーのみ)
 !   属性の読み書き   : write_attribute / read_attribute
 !                      write の attrs=[ ... ] / units="..." でも同時指定可
 !
@@ -221,7 +221,7 @@ contains
   end subroutine h5fort_serial_close
 
   !============================================================================
-  ! write PASS wrappers — real64 / real32 / int32 scalars and arrays
+  ! write PASS wrappers — real64 / real32 / int32 / int64 scalars and arrays
   !============================================================================
 #:for kname, ftype, h5type in KINDS
   subroutine h5fort_serial_write_${kname}$_0d(self, dset_path, scalar, mode, attrs, units)
@@ -285,7 +285,7 @@ contains
 #:endfor
 
   !============================================================================
-  ! read PASS wrappers — real64 / real32 / int32 scalars and arrays
+  ! read PASS wrappers — real64 / real32 / int32 / int64 scalars and arrays
   !============================================================================
 #:for kname, ftype, h5type in KINDS
   subroutine h5fort_serial_read_${kname}$_0d(self, dset_path, scalar)
@@ -334,7 +334,7 @@ contains
 #:endfor
 
   !============================================================================
-  ! read_fixed PASS wrappers — real64 / real32 / int32 (1D–4D)
+  ! read_fixed PASS wrappers — real64 / real32 / int32 / int64 (1D–4D)
   !============================================================================
 #:for kname, ftype, h5type in KINDS
   #:for rank in RANKS

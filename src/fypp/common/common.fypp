@@ -1,7 +1,8 @@
 #:set KINDS = [&
   ('r64', 'real(real64)', 'H5T_NATIVE_DOUBLE'), &
   ('r32', 'real(real32)', 'H5T_NATIVE_REAL'), &
-  ('i32', 'integer(int32)', 'H5T_NATIVE_INTEGER') &
+  ('i32', 'integer(int32)', 'h5kind_to_type(int32, H5_INTEGER_KIND)'), &
+  ('i64', 'integer(int64)', 'h5kind_to_type(int64, H5_INTEGER_KIND)') &
 ]
 #:set RANKS = [1, 2, 3, 4]
 

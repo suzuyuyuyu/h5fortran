@@ -32,6 +32,7 @@ HDF5を読める。XDMFの`Version="3.0"`は外部規格の版であり、製品
 | `real(real64)` | yes | yes |
 | `real(real32)` | yes | yes |
 | `integer(int32)` | yes | yes |
+| `integer(int64)` | yes | yes |
 | `logical` | yes | yes |
 | scalar `character` | yes | no |
 | 文字列属性・`units` | read / write | no |
@@ -64,6 +65,9 @@ HDF5ライブラリ全体の開始・終了とは独立している。
 
 allocatable read は dataset の rank を確認してから allocate する。fixed-size read は rank と各次元の長さが一致しない場合に失敗する。
 
+`h5fort_get_dataset_info(file_id, path, rank, shape, hdferr)` はdatasetを読み込まず、
+rankと各次元長（`integer(int64), allocatable`）を返す。
+
 ## Parallel 分割
 
 Parallel 配列は最終次元を MPI rank 間の分割方向とする。最終次元の長さは rank ごとに異なってよく、0 も許可する。それ以外の次元は全 rank で一致しなければならず、不一致は HDF5 collective call より前に拒否する。
@@ -83,6 +87,13 @@ write時とread時の両方で、`data` の最終次元長が `__partition__` �
 
 `__partition__` の名前は `H5FORT_DSET_PARTITION_DNAME` で変更できる。
 
+`t_h5fort_parallel%comm` と `%info` は既定で `MPI_COMM_WORLD` と
+`MPI_INFO_NULL` であり、open/read/writeに同じ値を使う。`%transfer_mode` は既定の
+`H5FORTRAN_XFER_COLLECTIVE` または `H5FORTRAN_XFER_INDEPENDENT` を指定できる。
+手続きAPIでは `comm=` と `transfer_mode=` のoptional引数で同じ設定を渡す。
+ローカル長0のrankはfile dataspaceを`h5sselect_none_f`、memory dataspaceを
+`H5S_NULL_F`で明示的に空選択する。
+
 ## 生成物
 
 `src/fypp/` の `.fypp` を生成元とし、`src/serial/` と `src/parallel/` の型・rank 展開済みソースは直接編集しない。fypp 3.2 を使用し、`src/fypp/generate_fypp.sh --check` で同期を検証する。
@@ -94,6 +105,9 @@ root属性は `scheme_version` と `time`、mesh group属性は `topology_type` 
 `nodes_per_element`、vector/tensor dataset属性は `attribute_type` とする。
 geometry は real32/real64/real128、connectivity は int8/int16/int32/int64、
 point/cell data はこれら7 kindの1D・2Dに対応する。
+
+`attribute_type=Tensor6`（成分数6）の成分順序はXDMF 3に従い、
+`XX, XY, XZ, YY, YZ, ZZ` とする。利用者はこの順序で第1次元を構成しなければならない。
 
 connectivityを持つmeshは `mesh_name`、XDMFの `topology_type`、
 `nodes_per_element` を指定することで一般化する。既定値は

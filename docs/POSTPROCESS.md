@@ -126,6 +126,13 @@ uv run h5xdmf "../result/seq*.h5" \
 - 通常実行: 新しいsnapshotだけをmanifestへ追加してXDMFを生成
 - `--rebuild`: `metadata.h5` を最初から再構築
 - `--generate-only`: snapshotを走査せず、既存manifestからXDMFだけを再生成
+- `--prune`: 存在しないsnapshotをmanifestから除外してstep indexを詰め直す
+
+snapshotのschemaだけを検査する場合は次を実行する。
+
+```sh
+uv run h5xdmf validate "../result/seq*.h5"
+```
 
 ## 完成形のexample
 
@@ -156,5 +163,5 @@ example/visualization/result/
 - 実運用では一時名へ出力し、close後に最終的な `.h5` 名へrenameする方法を推奨する。
 - `metadata.h5` は索引なのでバックアップ必須ではないが、再走査を避けるため通常は保持する。
 - snapshotを同じファイル名で上書きした場合、既存manifestは自動再索引化しない。
-- snapshotを削除した場合、現在はmanifestから自動削除しない。
+- snapshotを削除した場合は`--prune`でmanifestから明示的に除外する。
 - XDMF `Mixed` topologyは未対応である。

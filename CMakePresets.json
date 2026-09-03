@@ -1,26 +1,70 @@
 {
   "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 20, "patch": 0 },
   "configurePresets": [
     {
-      "name": "intel-mpi",
-      "displayName": "Intel MPI (mpiifx) + Parallel HDF5",
-      "binaryDir": "${sourceDir}/build",
+      "name": "base",
+      "hidden": true,
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_Fortran_COMPILER": "mpiifx",
-        "CMAKE_INSTALL_PREFIX": "$env{HOME}/.local/h5fortran"
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "H5FORTRAN_BUILD_TESTS": "ON"
       }
+    },
+    {
+      "name": "serial",
+      "hidden": true,
+      "inherits": "base",
+      "cacheVariables": {
+        "H5FORTRAN_ENABLE_SERIAL": "ON",
+        "H5FORTRAN_ENABLE_PARALLEL": "OFF"
+      }
+    },
+    {
+      "name": "parallel",
+      "hidden": true,
+      "inherits": "base",
+      "cacheVariables": {
+        "H5FORTRAN_ENABLE_SERIAL": "ON",
+        "H5FORTRAN_ENABLE_PARALLEL": "ON"
+      }
+    },
+    {
+      "name": "intel",
+      "inherits": "serial",
+      "displayName": "Intel LLVM, serial HDF5",
+      "cacheVariables": { "CMAKE_Fortran_COMPILER": "ifx" }
+    },
+    {
+      "name": "intel-mpi",
+      "inherits": "parallel",
+      "displayName": "Intel LLVM + Intel MPI, parallel HDF5",
+      "cacheVariables": { "CMAKE_Fortran_COMPILER": "mpiifx" }
+    },
+    {
+      "name": "gnu",
+      "inherits": "serial",
+      "displayName": "GNU, serial HDF5",
+      "cacheVariables": { "CMAKE_Fortran_COMPILER": "gfortran" }
+    },
+    {
+      "name": "gnu-mpi",
+      "inherits": "parallel",
+      "displayName": "GNU + MPI, parallel HDF5",
+      "cacheVariables": { "CMAKE_Fortran_COMPILER": "mpifort" }
     }
   ],
   "buildPresets": [
-    {
-      "name": "intel-mpi",
-      "configurePreset": "intel-mpi"
-    }
+    { "name": "intel", "configurePreset": "intel" },
+    { "name": "intel-mpi", "configurePreset": "intel-mpi" },
+    { "name": "gnu", "configurePreset": "gnu" },
+    { "name": "gnu-mpi", "configurePreset": "gnu-mpi" }
   ],
   "testPresets": [
-    {
-      "name": "intel-mpi",
-      "configurePreset": "intel-mpi"
-    }
+    { "name": "intel", "configurePreset": "intel", "filter": { "include": { "label": "quick" } }, "output": { "outputOnFailure": true } },
+    { "name": "intel-mpi", "configurePreset": "intel-mpi", "filter": { "include": { "label": "quick" } }, "output": { "outputOnFailure": true } },
+    { "name": "gnu", "configurePreset": "gnu", "filter": { "include": { "label": "quick" } }, "output": { "outputOnFailure": true } },
+    { "name": "gnu-mpi", "configurePreset": "gnu-mpi", "filter": { "include": { "label": "quick" } }, "output": { "outputOnFailure": true } }
   ]
 }

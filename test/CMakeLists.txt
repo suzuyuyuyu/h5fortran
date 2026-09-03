@@ -3,7 +3,8 @@ if(FYPP_EXECUTABLE)
   add_test(NAME generated_sources
     COMMAND "${PROJECT_SOURCE_DIR}/src/fypp/generate_fypp.sh" --check)
   set_tests_properties(generated_sources PROPERTIES
-    ENVIRONMENT "FYPP=${FYPP_EXECUTABLE}")
+    ENVIRONMENT "FYPP=${FYPP_EXECUTABLE}"
+    LABELS quick)
 endif()
 
 if(H5FORTRAN_ENABLE_SERIAL)
@@ -13,13 +14,16 @@ if(H5FORTRAN_ENABLE_SERIAL)
     Fortran_PREPROCESS ON
     Fortran_MODULE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/mod-serial")
   add_test(NAME serial COMMAND test_serial)
-  set_tests_properties(serial PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+  set_tests_properties(serial PROPERTIES
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+    LABELS quick)
 
   configure_file(consumer/CMakeLists.txt consumer/CMakeLists.txt COPYONLY)
   configure_file(consumer/main.F90 consumer/main.F90 COPYONLY)
   configure_file(install-consumer.cmake.in install-consumer.cmake @ONLY)
   add_test(NAME install_consumer
     COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/install-consumer.cmake")
+  set_tests_properties(install_consumer PROPERTIES LABELS quick)
 endif()
 
 if(H5FORTRAN_ENABLE_PARALLEL)
@@ -33,7 +37,9 @@ if(H5FORTRAN_ENABLE_PARALLEL)
   if(MPIEXEC_EXECUTABLE)
     add_test(NAME parallel
       COMMAND "${MPIEXEC_EXECUTABLE}" "${MPIEXEC_NUMPROC_FLAG}" 4 $<TARGET_FILE:test_parallel>)
-    set_tests_properties(parallel PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+    set_tests_properties(parallel PROPERTIES
+      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+      LABELS mpi)
 
     add_executable(test_visualization test-visualization.F90)
     target_link_libraries(test_visualization PRIVATE h5fortran)
@@ -41,7 +47,9 @@ if(H5FORTRAN_ENABLE_PARALLEL)
       Fortran_MODULE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/mod-visualization")
     add_test(NAME visualization_hdf5
       COMMAND "${MPIEXEC_EXECUTABLE}" "${MPIEXEC_NUMPROC_FLAG}" 2 $<TARGET_FILE:test_visualization>)
-    set_tests_properties(visualization_hdf5 PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
+    set_tests_properties(visualization_hdf5 PROPERTIES
+      WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+      LABELS mpi)
 
   endif()
 endif()

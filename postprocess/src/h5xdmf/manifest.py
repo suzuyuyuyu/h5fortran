@@ -221,6 +221,28 @@ def read_manifest(path: str) -> Manifest:
     return manifest
 
 
+def prune_manifest(path: str) -> Manifest:
+    """Remove records for snapshots that no longer exist and rewrite atomically."""
+    import os
+
+    manifest = read_manifest(path)
+    base = os.path.dirname(os.path.abspath(path))
+    keep = [os.path.isfile(os.path.join(base, relpath)) for relpath in manifest.files]
+    step_map = {old: new for new, old in enumerate(i for i, present in enumerate(keep) if present)}
+    manifest.times = [value for value, present in zip(manifest.times, keep) if present]
+    manifest.files = [value for value, present in zip(manifest.files, keep) if present]
+    for series in manifest.meshes.values():
+        series.records = [
+            MeshRecord(step_map[record.step_index], record.num_nodes, record.num_elements)
+            for record in series.records
+            if record.step_index in step_map
+        ]
+    temporary = f"{path}.prune"
+    write_manifest(temporary, manifest)
+    os.replace(temporary, path)
+    return manifest
+
+
 def _read_mesh_schema(mg: h5py.Group, name: str) -> MeshSchema:
     geom = mg["geometry"]
     conn_dt = geom.attrs.get("connectivity_dtype")

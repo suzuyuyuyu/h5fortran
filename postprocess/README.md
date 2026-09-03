@@ -23,6 +23,9 @@ uv run h5xdmf "phdf5/seq*.h5" --metadata metadata.h5 --outdir xdmf
 同じコマンドの再実行は新しいstepだけをmanifestへ追記します。全再構築は
 `--rebuild`、既存manifestからXDMFだけを再生成する場合は
 `--generate-only --metadata metadata.h5` を使います。
+削除済みsnapshotをmanifestから除くには`--prune`、schema検査だけを行うには
+`uv run h5xdmf validate "phdf5/seq*.h5"`を使います。同じrun内の番号付きファイルは、
+任意の桁数を選べますがゼロ埋め幅を統一してください。
 
 粒子数などが0になるstepは、子Gridを持たないSpatial CollectionとしてXDMFへ
 出力される。HDF5の空datasetは保持されるが、XDMFからは参照しない。

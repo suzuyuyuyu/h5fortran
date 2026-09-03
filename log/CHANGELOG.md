@@ -1,5 +1,15 @@
 # 変更履歴
 
+## v1.1.0
+
+- 汎用Serial/Parallel APIへ`integer(int64)`を追加した。
+- datasetのrank・shapeを取得する`h5fort_get_dataset_info`を追加した。
+- Parallel APIでcommunicator、MPI_Info、collective/independent転送を選択可能にした。
+- Parallel write開始時のrank間エラー判定を同期し、空rankの選択を明示した。
+- `h5xdmf validate`、`--prune`、snapshotファイル名のゼロ埋め幅検査を追加した。
+- 配布用CMake package/version/exportとIntel LLVM・GNU向けpresetを整備した。
+- Tensor6の成分順序をXDMF 3準拠として文書化した。
+
 ## v1.0.0
 
 - Serial / Parallel HDF5のFortranラッパーを整備した。

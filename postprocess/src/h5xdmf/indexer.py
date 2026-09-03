@@ -24,6 +24,7 @@ from .manifest import (
     write_manifest,
 )
 from .model import MeshBlock, Snapshot
+from .naming import validate_sequence_names
 
 
 def build_manifest(paths: Iterable[str], *, relative_to: str) -> Manifest:
@@ -31,6 +32,7 @@ def build_manifest(paths: Iterable[str], *, relative_to: str) -> Manifest:
     paths = list(paths)
     if not paths:
         raise ValueError("build_manifest: no seq files given")
+    validate_sequence_names(paths)
 
     manifest: Manifest | None = None
     for path in paths:
@@ -42,6 +44,7 @@ def build_manifest(paths: Iterable[str], *, relative_to: str) -> Manifest:
 def update_manifest(meta_path: str, paths: Iterable[str], *, relative_to: str) -> Manifest:
     """Append snapshots not already indexed by an existing manifest."""
     paths = list(paths)
+    validate_sequence_names(paths)
     if not os.path.exists(meta_path):
         manifest = build_manifest(paths, relative_to=relative_to)
         write_manifest(meta_path, manifest)

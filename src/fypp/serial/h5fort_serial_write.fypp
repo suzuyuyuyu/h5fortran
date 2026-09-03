@@ -182,7 +182,7 @@ contains
   end subroutine create_scalar_dataset
 
   !============================================================================
-  ! real64 / real32 / int32 — scalar (0D)
+  ! real64 / real32 / int32 / int64 — scalar (0D)
   !============================================================================
 #:for kname, ftype, h5type in KINDS
   subroutine h5fort_write_${kname}$_0d(file_id, dset_path, scalar, hdferr, mode, attrs, units)
@@ -216,7 +216,7 @@ contains
 #:endfor
 
   !============================================================================
-  ! real64 / real32 / int32 — arrays (1D–4D)
+  ! real64 / real32 / int32 / int64 — arrays (1D–4D)
   !============================================================================
 #:for kname, ftype, h5type in KINDS
   #:for rank in RANKS

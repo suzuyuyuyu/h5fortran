@@ -83,6 +83,7 @@ call h5fort_sread(file_id, "/value", restored, hdferr)
 call h5fort_sread_fixed(file_id, "/flags", flags, hdferr)
 call h5fort_write_attribute(file_id, "/value", "units", "m/s", hdferr)
 call h5fort_read_attribute(file_id, "/value", "units", units, hdferr)
+call h5fort_get_dataset_info(file_id, "/value", dataset_rank, dataset_shape, hdferr)
 ```
 
 ## Parallel: OOP API
@@ -105,6 +106,9 @@ call h5open_f(hdferr)
 if (hdferr /= 0) call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
 
 file%f_name = "parallel.h5"
+file%comm = subcomm                 ! 省略時は MPI_COMM_WORLD
+file%info = MPI_INFO_NULL           ! ROMIO hintsを設定したMPI_Infoも指定可能
+file%transfer_mode = H5FORTRAN_XFER_COLLECTIVE
 call file%open(H5FORTRAN_FORCE_WRITE)
 call file%write("/value", local_values)
 call file%close()
@@ -122,7 +126,9 @@ Parallelでは全rankが `MPI_Init` の後に `h5open_f`、全HDF5ファイル�
 `MPI_Finalize` の前に `h5close_f` を呼びます。ファイルごとの `open` / `close` と
 HDF5ライブラリ全体の `h5open_f` / `h5close_f` は別のライフサイクルです。
 
-手続き API は `h5fort_pwrite`、`h5fort_pread`、`h5fort_pread_fixed` です。Parallel の文字列 I/O は現在未実装です。
+手続き API は `h5fort_pwrite`、`h5fort_pread`、`h5fort_pread_fixed` です。
+`comm=` と `transfer_mode=H5FORTRAN_XFER_COLLECTIVE|H5FORTRAN_XFER_INDEPENDENT`
+を指定できます。Parallel の文字列 I/O は現在未実装です。
 
 ## Parallel の保存形式
 

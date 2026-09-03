@@ -1,7 +1,6 @@
 ! DO NOT EDIT — generated from src/fypp/parallel/h5fort_parallel_read.fypp
 ! To regenerate: src/fypp/generate_fypp.sh
 #:include "common.fypp"
-#:set H5T_KIND = {'r64': 'H5T_NATIVE_DOUBLE', 'r32': 'H5T_NATIVE_REAL'}
 #include "h5fort_config.inc"
 #include "h5fort_parallel.inc"
 module h5fort_parallel_read
@@ -21,9 +20,11 @@ module h5fort_parallel_read
 
 contains
 
-  subroutine begin_parallel_read(file_id, dset_path, data_id, file_space_id, xfer_id, nlocal, local_offset, hdferr)
+  subroutine begin_parallel_read(file_id, dset_path, comm, transfer_mode, data_id, file_space_id, xfer_id, &
+                                 nlocal, local_offset, hdferr)
     integer(hid_t), intent(in) :: file_id
     character(len=*), intent(in) :: dset_path
+    integer, intent(in) :: comm, transfer_mode
     integer(hid_t), intent(out) :: data_id, file_space_id, xfer_id
     integer(int64), intent(out) :: nlocal, local_offset
     integer, intent(out) :: hdferr
@@ -37,8 +38,8 @@ contains
     xfer_id       = -1_hid_t
     hdferr        = 0
 
-    call MPI_Comm_rank(MPI_COMM_WORLD, me, mpi_err)
-    call MPI_Comm_size(MPI_COMM_WORLD, nprocs, mpi_err)
+    call MPI_Comm_rank(comm, me, mpi_err)
+    call MPI_Comm_size(comm, nprocs, mpi_err)
     if (mpi_err /= MPI_SUCCESS) then
       hdferr = -1
       return
@@ -84,7 +85,13 @@ contains
     nlocal = partition_(me + 1) - partition_(me)
 
     call h5pcreate_f(H5P_DATASET_XFER_F, xfer_id, hdferr)
-    if (hdferr == 0) call h5pset_dxpl_mpio_f(xfer_id, H5FD_MPIO_COLLECTIVE_F, hdferr)
+    if (hdferr == 0) then
+      if (transfer_mode == 1) then
+        call h5pset_dxpl_mpio_f(xfer_id, H5FD_MPIO_INDEPENDENT_F, hdferr)
+      else
+        call h5pset_dxpl_mpio_f(xfer_id, H5FD_MPIO_COLLECTIVE_F, hdferr)
+      end if
+    end if
     if (hdferr /= 0) call cleanup_parallel_read_begin(data_id, file_space_id, xfer_id, hdferr)
   end subroutine begin_parallel_read
 
@@ -194,14 +201,15 @@ contains
   ! h5fort_read_{kname}_0d — scalar (1D に委譲)
   !============================================================================
 #:for kname, ftype, h5type in KINDS
-  subroutine h5fort_read_${kname}$_0d(file_id, dset_path, scalar, hdferr)
+  subroutine h5fort_read_${kname}$_0d(file_id, dset_path, scalar, hdferr, comm, transfer_mode)
     integer(hid_t), intent(in) :: file_id
     character(len=*), intent(in) :: dset_path
     ${ftype}$, intent(out) :: scalar
     integer, intent(out) :: hdferr
+    integer, intent(in), optional :: comm, transfer_mode
     ${ftype}$, allocatable :: array(:)
 
-    call h5fort_read_${kname}$_1d(file_id, dset_path, array, hdferr)
+    call h5fort_read_${kname}$_1d(file_id, dset_path, array, hdferr, comm, transfer_mode)
     if (hdferr == 0) then
       if (size(array) /= 1) then
         hdferr = -1
@@ -217,31 +225,25 @@ contains
   ! h5fort_read_{kname}_1d — 1D allocatable
   !============================================================================
 #:for kname, ftype, h5type in KINDS
-  subroutine h5fort_read_${kname}$_1d(file_id, dset_path, array, hdferr)
+  subroutine h5fort_read_${kname}$_1d(file_id, dset_path, array, hdferr, comm, transfer_mode)
     integer(hid_t), intent(in) :: file_id
     character(len=*), intent(in) :: dset_path
     ${ftype}$, allocatable, intent(out) :: array(:)
     integer, intent(out) :: hdferr
+    integer, intent(in), optional :: comm, transfer_mode
     integer(hid_t) :: data_id, fsid, msid, xfer_id
-    #:if kname == 'i32'
-    integer(hid_t) :: h5t_i32
-    #:endif
     integer(int64) :: nlocal, local_offset
     integer(hsize_t) :: dims_m(1)
+    integer :: comm_, transfer_mode_
 
-    #:if kname == 'i32'
-    h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
-    #:endif
+    comm_ = MPI_COMM_WORLD; if (present(comm)) comm_ = comm
+    transfer_mode_ = 0; if (present(transfer_mode)) transfer_mode_ = transfer_mode
     msid = -1_hid_t
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, nlocal, local_offset, hdferr)
+    call begin_parallel_read(file_id, dset_path, comm_, transfer_mode_, data_id, fsid, xfer_id, nlocal, local_offset, hdferr)
     if (hdferr /= 0) return
     allocate(array(nlocal))
     call select_1d_slab(fsid, nlocal, local_offset, dims_m, msid, hdferr)
-    #:if kname == 'i32'
-    if (hdferr == 0) call h5dread_f(data_id, h5t_i32, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
-    #:else
     if (hdferr == 0) call h5dread_f(data_id, ${h5type}$, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
-    #:endif
     call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
   end subroutine h5fort_read_${kname}$_1d
 
@@ -252,24 +254,22 @@ contains
   !============================================================================
 #:for kname, ftype, h5type in KINDS
   #:for rank in RANKS[1:]
-  subroutine h5fort_read_${kname}$_${rank}$d(file_id, dset_path, array, hdferr)
+  subroutine h5fort_read_${kname}$_${rank}$d(file_id, dset_path, array, hdferr, comm, transfer_mode)
     integer(hid_t), intent(in) :: file_id
     character(len=*), intent(in) :: dset_path
     ${ftype}$, allocatable, intent(out) :: array(${', '.join([':']*rank)}$)
     integer, intent(out) :: hdferr
+    integer, intent(in), optional :: comm, transfer_mode
     integer(hid_t) :: data_id, fsid, msid, xfer_id
-    #:if kname == 'i32'
-    integer(hid_t) :: h5t_i32
-    #:endif
     integer(int64) :: nlocal, local_offset
     integer :: rank_
     integer(hsize_t) :: dims(MAX_RANK), dims_m(${rank}$)
+    integer :: comm_, transfer_mode_
 
-    #:if kname == 'i32'
-    h5t_i32 = h5kind_to_type(int32, H5_INTEGER_KIND)
-    #:endif
+    comm_ = MPI_COMM_WORLD; if (present(comm)) comm_ = comm
+    transfer_mode_ = 0; if (present(transfer_mode)) transfer_mode_ = transfer_mode
     msid = -1_hid_t
-    call begin_parallel_read(file_id, dset_path, data_id, fsid, xfer_id, nlocal, local_offset, hdferr)
+    call begin_parallel_read(file_id, dset_path, comm_, transfer_mode_, data_id, fsid, xfer_id, nlocal, local_offset, hdferr)
     if (hdferr /= 0) return
     call get_data_rank_dims(data_id, rank_, dims, hdferr)
     if (hdferr == 0 .and. rank_ /= ${rank}$) hdferr = -1
@@ -281,11 +281,7 @@ contains
     #:elif rank == 4
     if (hdferr == 0) call select_4d_slab(fsid, int(dims(1), int64), int(dims(2), int64), int(dims(3), int64), nlocal, local_offset, dims_m, msid, hdferr)
     #:endif
-    #:if kname == 'i32'
-    if (hdferr == 0) call h5dread_f(data_id, h5t_i32, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
-    #:else
     if (hdferr == 0) call h5dread_f(data_id, ${h5type}$, array, dims_m, hdferr, mem_space_id=msid, file_space_id=fsid, xfer_prp=xfer_id)
-    #:endif
     call end_parallel_read(data_id, fsid, msid, xfer_id, hdferr)
   end subroutine h5fort_read_${kname}$_${rank}$d
 
@@ -309,26 +305,28 @@ contains
   !============================================================================
   ! h5fort_read_lgc_{rank}d — logical (int32 から変換)
   !============================================================================
-  subroutine h5fort_read_lgc_0d(file_id, dset_path, scalar, hdferr)
+  subroutine h5fort_read_lgc_0d(file_id, dset_path, scalar, hdferr, comm, transfer_mode)
     integer(hid_t), intent(in) :: file_id
     character(len=*), intent(in) :: dset_path
     logical, intent(out) :: scalar
     integer, intent(out) :: hdferr
+    integer, intent(in), optional :: comm, transfer_mode
     integer(int32) :: ival
 
-    call h5fort_read_i32_0d(file_id, dset_path, ival, hdferr)
+    call h5fort_read_i32_0d(file_id, dset_path, ival, hdferr, comm, transfer_mode)
     if (hdferr == 0) scalar = (ival /= 0_int32)
   end subroutine h5fort_read_lgc_0d
 
 #:for rank in RANKS
-  subroutine h5fort_read_lgc_${rank}$d(file_id, dset_path, array, hdferr)
+  subroutine h5fort_read_lgc_${rank}$d(file_id, dset_path, array, hdferr, comm, transfer_mode)
     integer(hid_t), intent(in) :: file_id
     character(len=*), intent(in) :: dset_path
     logical, allocatable, intent(out) :: array(${', '.join([':']*rank)}$)
     integer, intent(out) :: hdferr
+    integer, intent(in), optional :: comm, transfer_mode
     integer(int32), allocatable :: iarray(${', '.join([':']*rank)}$)
 
-    call h5fort_read_i32_${rank}$d(file_id, dset_path, iarray, hdferr)
+    call h5fort_read_i32_${rank}$d(file_id, dset_path, iarray, hdferr, comm, transfer_mode)
     if (hdferr == 0) then
       allocate(array(${', '.join(['size(iarray,' + str(i+1) + ')' for i in range(rank)])}$))
       array = (iarray /= 0_int32)

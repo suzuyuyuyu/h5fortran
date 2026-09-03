@@ -9,7 +9,7 @@
 !   中間グループはhdf5_writeが自動生成する。
 !
 !   対応する配列ランク: scalar, 1D, 2D, 3D, 4D (allocatable および固定長)
-!   対応する型        : real(real64), real(real32), integer(int32), logical (int32で保存), character (スカラーのみ)
+!   対応する型        : real(real64), real(real32), integer(int32/int64), logical (int32で保存), character (スカラーのみ)
 !   属性の読み書き   : write_attribute / read_attribute
 !                      write の attrs=[ ... ] / units="..." でも同時指定可
 !
@@ -50,6 +50,7 @@ module h5fort_serial
     module procedure h5fort_write_r64_0d, h5fort_write_r64_1d, h5fort_write_r64_2d, h5fort_write_r64_3d, h5fort_write_r64_4d
     module procedure h5fort_write_r32_0d, h5fort_write_r32_1d, h5fort_write_r32_2d, h5fort_write_r32_3d, h5fort_write_r32_4d
     module procedure h5fort_write_i32_0d, h5fort_write_i32_1d, h5fort_write_i32_2d, h5fort_write_i32_3d, h5fort_write_i32_4d
+    module procedure h5fort_write_i64_0d, h5fort_write_i64_1d, h5fort_write_i64_2d, h5fort_write_i64_3d, h5fort_write_i64_4d
     module procedure h5fort_write_str_0d
     module procedure h5fort_write_lgc_0d, h5fort_write_lgc_1d, h5fort_write_lgc_2d, h5fort_write_lgc_3d, h5fort_write_lgc_4d
   end interface h5fort_swrite
@@ -58,6 +59,7 @@ module h5fort_serial
     module procedure h5fort_read_r64_0d, h5fort_read_r64_1d, h5fort_read_r64_2d, h5fort_read_r64_3d, h5fort_read_r64_4d
     module procedure h5fort_read_r32_0d, h5fort_read_r32_1d, h5fort_read_r32_2d, h5fort_read_r32_3d, h5fort_read_r32_4d
     module procedure h5fort_read_i32_0d, h5fort_read_i32_1d, h5fort_read_i32_2d, h5fort_read_i32_3d, h5fort_read_i32_4d
+    module procedure h5fort_read_i64_0d, h5fort_read_i64_1d, h5fort_read_i64_2d, h5fort_read_i64_3d, h5fort_read_i64_4d
     module procedure h5fort_read_str_0d
     module procedure h5fort_read_lgc_0d, h5fort_read_lgc_1d, h5fort_read_lgc_2d, h5fort_read_lgc_3d, h5fort_read_lgc_4d
   end interface h5fort_sread
@@ -66,6 +68,7 @@ module h5fort_serial
     module procedure h5fort_read_r64_1d_fixed, h5fort_read_r64_2d_fixed, h5fort_read_r64_3d_fixed, h5fort_read_r64_4d_fixed
     module procedure h5fort_read_r32_1d_fixed, h5fort_read_r32_2d_fixed, h5fort_read_r32_3d_fixed, h5fort_read_r32_4d_fixed
     module procedure h5fort_read_i32_1d_fixed, h5fort_read_i32_2d_fixed, h5fort_read_i32_3d_fixed, h5fort_read_i32_4d_fixed
+    module procedure h5fort_read_i64_1d_fixed, h5fort_read_i64_2d_fixed, h5fort_read_i64_3d_fixed, h5fort_read_i64_4d_fixed
     module procedure h5fort_read_lgc_1d_fixed, h5fort_read_lgc_2d_fixed, h5fort_read_lgc_3d_fixed, h5fort_read_lgc_4d_fixed
   end interface h5fort_sread_fixed
 
@@ -94,6 +97,11 @@ module h5fort_serial
     procedure, private :: write_i32_2d => h5fort_serial_write_i32_2d
     procedure, private :: write_i32_3d => h5fort_serial_write_i32_3d
     procedure, private :: write_i32_4d => h5fort_serial_write_i32_4d
+    procedure, private :: write_i64_0d => h5fort_serial_write_i64_0d
+    procedure, private :: write_i64_1d => h5fort_serial_write_i64_1d
+    procedure, private :: write_i64_2d => h5fort_serial_write_i64_2d
+    procedure, private :: write_i64_3d => h5fort_serial_write_i64_3d
+    procedure, private :: write_i64_4d => h5fort_serial_write_i64_4d
     procedure, private :: write_str_0d => h5fort_serial_write_str_0d
     procedure, private :: write_lgc_0d => h5fort_serial_write_lgc_0d
     procedure, private :: write_lgc_1d => h5fort_serial_write_lgc_1d
@@ -116,6 +124,11 @@ module h5fort_serial
       write_i32_2d, &
       write_i32_3d, &
       write_i32_4d, &
+      write_i64_0d, &
+      write_i64_1d, &
+      write_i64_2d, &
+      write_i64_3d, &
+      write_i64_4d, &
       write_str_0d, &
       write_lgc_0d, &
       write_lgc_1d, &
@@ -138,6 +151,11 @@ module h5fort_serial
     procedure, private :: read_i32_2d => h5fort_serial_read_i32_2d
     procedure, private :: read_i32_3d => h5fort_serial_read_i32_3d
     procedure, private :: read_i32_4d => h5fort_serial_read_i32_4d
+    procedure, private :: read_i64_0d => h5fort_serial_read_i64_0d
+    procedure, private :: read_i64_1d => h5fort_serial_read_i64_1d
+    procedure, private :: read_i64_2d => h5fort_serial_read_i64_2d
+    procedure, private :: read_i64_3d => h5fort_serial_read_i64_3d
+    procedure, private :: read_i64_4d => h5fort_serial_read_i64_4d
     procedure, private :: read_str_0d => h5fort_serial_read_str_0d
     procedure, private :: read_lgc_0d => h5fort_serial_read_lgc_0d
     procedure, private :: read_lgc_1d => h5fort_serial_read_lgc_1d
@@ -160,6 +178,11 @@ module h5fort_serial
       read_i32_2d, &
       read_i32_3d, &
       read_i32_4d, &
+      read_i64_0d, &
+      read_i64_1d, &
+      read_i64_2d, &
+      read_i64_3d, &
+      read_i64_4d, &
       read_str_0d, &
       read_lgc_0d, &
       read_lgc_1d, &
@@ -179,6 +202,10 @@ module h5fort_serial
     procedure, private :: read_i32_2d_fixed => h5fort_serial_read_i32_2d_fixed
     procedure, private :: read_i32_3d_fixed => h5fort_serial_read_i32_3d_fixed
     procedure, private :: read_i32_4d_fixed => h5fort_serial_read_i32_4d_fixed
+    procedure, private :: read_i64_1d_fixed => h5fort_serial_read_i64_1d_fixed
+    procedure, private :: read_i64_2d_fixed => h5fort_serial_read_i64_2d_fixed
+    procedure, private :: read_i64_3d_fixed => h5fort_serial_read_i64_3d_fixed
+    procedure, private :: read_i64_4d_fixed => h5fort_serial_read_i64_4d_fixed
     procedure, private :: read_lgc_1d_fixed => h5fort_serial_read_lgc_1d_fixed
     procedure, private :: read_lgc_2d_fixed => h5fort_serial_read_lgc_2d_fixed
     procedure, private :: read_lgc_3d_fixed => h5fort_serial_read_lgc_3d_fixed
@@ -196,6 +223,10 @@ module h5fort_serial
       read_i32_2d_fixed, &
       read_i32_3d_fixed, &
       read_i32_4d_fixed, &
+      read_i64_1d_fixed, &
+      read_i64_2d_fixed, &
+      read_i64_3d_fixed, &
+      read_i64_4d_fixed, &
       read_lgc_1d_fixed, &
       read_lgc_2d_fixed, &
       read_lgc_3d_fixed, &
@@ -268,7 +299,7 @@ contains
   end subroutine h5fort_serial_close
 
   !============================================================================
-  ! write PASS wrappers — real64 / real32 / int32 scalars and arrays
+  ! write PASS wrappers — real64 / real32 / int32 / int64 scalars and arrays
   !============================================================================
   subroutine h5fort_serial_write_r64_0d(self, dset_path, scalar, mode, attrs, units)
     class(t_h5fort_serial), intent(inout) :: self
@@ -420,6 +451,56 @@ contains
     call h5fort_write_i32_4d(self%file_id, dset_path, array, self%hdferr, mode, attrs, units)
   end subroutine h5fort_serial_write_i32_4d
 
+  subroutine h5fort_serial_write_i64_0d(self, dset_path, scalar, mode, attrs, units)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*),  intent(in) :: dset_path
+    integer(int64),         intent(in) :: scalar
+    integer,           intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+    call h5fort_write_i64_0d(self%file_id, dset_path, scalar, self%hdferr, mode, attrs, units)
+  end subroutine h5fort_serial_write_i64_0d
+
+  subroutine h5fort_serial_write_i64_1d(self, dset_path, array, mode, attrs, units)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*),  intent(in) :: dset_path
+    integer(int64),         intent(in) :: array(:)
+    integer,           intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+    call h5fort_write_i64_1d(self%file_id, dset_path, array, self%hdferr, mode, attrs, units)
+  end subroutine h5fort_serial_write_i64_1d
+
+  subroutine h5fort_serial_write_i64_2d(self, dset_path, array, mode, attrs, units)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*),  intent(in) :: dset_path
+    integer(int64),         intent(in) :: array(:, :)
+    integer,           intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+    call h5fort_write_i64_2d(self%file_id, dset_path, array, self%hdferr, mode, attrs, units)
+  end subroutine h5fort_serial_write_i64_2d
+
+  subroutine h5fort_serial_write_i64_3d(self, dset_path, array, mode, attrs, units)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*),  intent(in) :: dset_path
+    integer(int64),         intent(in) :: array(:, :, :)
+    integer,           intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+    call h5fort_write_i64_3d(self%file_id, dset_path, array, self%hdferr, mode, attrs, units)
+  end subroutine h5fort_serial_write_i64_3d
+
+  subroutine h5fort_serial_write_i64_4d(self, dset_path, array, mode, attrs, units)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*),  intent(in) :: dset_path
+    integer(int64),         intent(in) :: array(:, :, :, :)
+    integer,           intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+    call h5fort_write_i64_4d(self%file_id, dset_path, array, self%hdferr, mode, attrs, units)
+  end subroutine h5fort_serial_write_i64_4d
+
 
   !============================================================================
   ! write PASS wrappers — character and logical
@@ -486,7 +567,7 @@ contains
 
 
   !============================================================================
-  ! read PASS wrappers — real64 / real32 / int32 scalars and arrays
+  ! read PASS wrappers — real64 / real32 / int32 / int64 scalars and arrays
   !============================================================================
   subroutine h5fort_serial_read_r64_0d(self, dset_path, scalar)
     class(t_h5fort_serial), intent(inout) :: self
@@ -593,6 +674,41 @@ contains
     call h5fort_read_i32_4d(self%file_id, dset_path, array, self%hdferr)
   end subroutine h5fort_serial_read_i32_4d
 
+  subroutine h5fort_serial_read_i64_0d(self, dset_path, scalar)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*), intent(in)  :: dset_path
+    integer(int64),        intent(out) :: scalar
+    call h5fort_read_i64_0d(self%file_id, dset_path, scalar, self%hdferr)
+  end subroutine h5fort_serial_read_i64_0d
+
+  subroutine h5fort_serial_read_i64_1d(self, dset_path, array)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*), intent(in)  :: dset_path
+    integer(int64), allocatable, intent(out) :: array(:)
+    call h5fort_read_i64_1d(self%file_id, dset_path, array, self%hdferr)
+  end subroutine h5fort_serial_read_i64_1d
+
+  subroutine h5fort_serial_read_i64_2d(self, dset_path, array)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*), intent(in)  :: dset_path
+    integer(int64), allocatable, intent(out) :: array(:, :)
+    call h5fort_read_i64_2d(self%file_id, dset_path, array, self%hdferr)
+  end subroutine h5fort_serial_read_i64_2d
+
+  subroutine h5fort_serial_read_i64_3d(self, dset_path, array)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*), intent(in)  :: dset_path
+    integer(int64), allocatable, intent(out) :: array(:, :, :)
+    call h5fort_read_i64_3d(self%file_id, dset_path, array, self%hdferr)
+  end subroutine h5fort_serial_read_i64_3d
+
+  subroutine h5fort_serial_read_i64_4d(self, dset_path, array)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*), intent(in)  :: dset_path
+    integer(int64), allocatable, intent(out) :: array(:, :, :, :)
+    call h5fort_read_i64_4d(self%file_id, dset_path, array, self%hdferr)
+  end subroutine h5fort_serial_read_i64_4d
+
 
   !============================================================================
   ! read PASS wrappers — character and logical
@@ -641,7 +757,7 @@ contains
 
 
   !============================================================================
-  ! read_fixed PASS wrappers — real64 / real32 / int32 (1D–4D)
+  ! read_fixed PASS wrappers — real64 / real32 / int32 / int64 (1D–4D)
   !============================================================================
   subroutine h5fort_serial_read_r64_1d_fixed(self, dset_path, array)
     class(t_h5fort_serial), intent(inout) :: self
@@ -726,6 +842,34 @@ contains
     integer(int32),        intent(out) :: array(:, :, :, :)
     call h5fort_read_i32_4d_fixed(self%file_id, dset_path, array, self%hdferr)
   end subroutine h5fort_serial_read_i32_4d_fixed
+
+  subroutine h5fort_serial_read_i64_1d_fixed(self, dset_path, array)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*), intent(in)  :: dset_path
+    integer(int64),        intent(out) :: array(:)
+    call h5fort_read_i64_1d_fixed(self%file_id, dset_path, array, self%hdferr)
+  end subroutine h5fort_serial_read_i64_1d_fixed
+
+  subroutine h5fort_serial_read_i64_2d_fixed(self, dset_path, array)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*), intent(in)  :: dset_path
+    integer(int64),        intent(out) :: array(:, :)
+    call h5fort_read_i64_2d_fixed(self%file_id, dset_path, array, self%hdferr)
+  end subroutine h5fort_serial_read_i64_2d_fixed
+
+  subroutine h5fort_serial_read_i64_3d_fixed(self, dset_path, array)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*), intent(in)  :: dset_path
+    integer(int64),        intent(out) :: array(:, :, :)
+    call h5fort_read_i64_3d_fixed(self%file_id, dset_path, array, self%hdferr)
+  end subroutine h5fort_serial_read_i64_3d_fixed
+
+  subroutine h5fort_serial_read_i64_4d_fixed(self, dset_path, array)
+    class(t_h5fort_serial), intent(inout) :: self
+    character(len=*), intent(in)  :: dset_path
+    integer(int64),        intent(out) :: array(:, :, :, :)
+    call h5fort_read_i64_4d_fixed(self%file_id, dset_path, array, self%hdferr)
+  end subroutine h5fort_serial_read_i64_4d_fixed
 
 
   subroutine h5fort_serial_read_lgc_1d_fixed(self, dset_path, array)

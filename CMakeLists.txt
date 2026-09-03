@@ -15,10 +15,12 @@ configure_file(
 
 include(CTest)
 include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 
 option(H5FORTRAN_ENABLE_SERIAL "Build the serial API" ON)
-option(H5FORTRAN_ENABLE_PARALLEL "Build the parallel MPI API" ON)
+option(H5FORTRAN_ENABLE_PARALLEL "Build the parallel MPI API" OFF)
 option(H5FORTRAN_BUILD_EXAMPLES "Build the example programs" ON)
+option(H5FORTRAN_BUILD_TESTS "Build the test programs" ${BUILD_TESTING})
 
 if(NOT H5FORTRAN_ENABLE_SERIAL AND NOT H5FORTRAN_ENABLE_PARALLEL)
   message(FATAL_ERROR "At least one of H5FORTRAN_ENABLE_SERIAL or H5FORTRAN_ENABLE_PARALLEL must be ON")
@@ -53,13 +55,18 @@ if(H5FORTRAN_BUILD_EXAMPLES)
   add_subdirectory(example)
 endif()
 
-configure_file(
+configure_package_config_file(
   "${PROJECT_SOURCE_DIR}/cmake/h5fortranConfig.cmake.in"
   "${CMAKE_CURRENT_BINARY_DIR}/h5fortranConfig.cmake"
-  @ONLY)
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/h5fortranConfig.cmake"
+  INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/h5fortran")
+write_basic_package_version_file(
+  "${CMAKE_CURRENT_BINARY_DIR}/h5fortranConfigVersion.cmake"
+  COMPATIBILITY SameMajorVersion)
+install(FILES
+  "${CMAKE_CURRENT_BINARY_DIR}/h5fortranConfig.cmake"
+  "${CMAKE_CURRENT_BINARY_DIR}/h5fortranConfigVersion.cmake"
   DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/h5fortran")
 
-if(BUILD_TESTING)
+if(H5FORTRAN_BUILD_TESTS)
   add_subdirectory(test)
 endif()

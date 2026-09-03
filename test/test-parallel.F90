@@ -6,7 +6,7 @@ program test_parallel
   implicit none
 
   integer, parameter :: nrank = 4
-  integer :: ierr, hdferr, me, nprocs
+  integer :: ierr, hdferr, me, nprocs, subcomm, color
   integer :: value_count(0:nrank - 1), coord_count(0:nrank - 1)
   integer :: nv, nc, ov, oc
   integer(hid_t) :: file_id, fapl_id
@@ -14,6 +14,7 @@ program test_parallel
   real(real64), allocatable :: coord_all(:, :), coord(:, :), coord_read(:, :), coord_fixed(:, :)
   real(real32), allocatable :: zero_local(:), zero_read(:)
   integer(int32), allocatable :: int_local(:), int_read(:)
+  integer(int64), allocatable :: int64_local(:), int64_read(:)
   integer(int64) :: expected_partition(0:nrank)
   logical, allocatable :: logical_local(:), logical_read(:), logical_fixed(:)
   logical :: exists
@@ -31,9 +32,10 @@ program test_parallel
   allocate(value(nv), value_fixed(nv), coord(3, nc), coord_fixed(3, nc))
   value = value_all(ov + 1:ov + nv)
   coord = coord_all(:, oc + 1:oc + nc)
-  allocate(zero_local(me), int_local(me + 1), logical_local(me + 1), logical_fixed(me + 1))
+  allocate(zero_local(me), int_local(me + 1), int64_local(me + 1), logical_local(me + 1), logical_fixed(me + 1))
   zero_local = real(me, real32)
   int_local = int(me, int32)
+  int64_local = int(me, int64) * 3000000000_int64
   logical_local = mod(me, 2) == 0
 
   call h5open_f(hdferr); call check(hdferr)
@@ -43,6 +45,7 @@ program test_parallel
   call h5fort_pwrite(file_id, "/coord", coord, hdferr); call check(hdferr)
   call h5fort_pwrite(file_id, "/zero", zero_local, hdferr); call check(hdferr)
   call h5fort_pwrite(file_id, "/integer", int_local, hdferr); call check(hdferr)
+  call h5fort_pwrite(file_id, "/integer64", int64_local, hdferr, transfer_mode=H5FORTRAN_XFER_INDEPENDENT); call check(hdferr)
   call h5fort_pwrite(file_id, "/logical", logical_local, hdferr); call check(hdferr)
   allocate(bad_dims(me + 1, 1))
   call h5fort_pwrite(file_id, "/bad-dimensions", bad_dims, hdferr)
@@ -57,6 +60,7 @@ program test_parallel
   call h5fort_pread_fixed(file_id, "/coord", coord_fixed, hdferr); call check(hdferr)
   call h5fort_pread(file_id, "/zero", zero_read, hdferr); call check(hdferr)
   call h5fort_pread(file_id, "/integer", int_read, hdferr); call check(hdferr)
+  call h5fort_pread(file_id, "/integer64", int64_read, hdferr, transfer_mode=H5FORTRAN_XFER_INDEPENDENT); call check(hdferr)
   call h5fort_pread(file_id, "/logical", logical_read, hdferr); call check(hdferr)
   call h5fort_pread_fixed(file_id, "/logical", logical_fixed, hdferr); call check(hdferr)
   call assert(all(abs(value_read - value) < 1.0e-12_real64))
@@ -65,6 +69,7 @@ program test_parallel
   call assert(all(abs(coord_fixed - coord) < 1.0e-12_real64))
   call assert(all(zero_read == zero_local))
   call assert(all(int_read == int_local))
+  call assert(all(int64_read == int64_local))
   call assert(all(logical_read .eqv. logical_local))
   call assert(all(logical_fixed .eqv. logical_local))
   call h5fort_pread(file_id, "/coord", wrong_rank, hdferr)
@@ -115,6 +120,26 @@ program test_parallel
     call h5fp%close(); call check(h5fp%hdferr)
     call h5fp%close(); call assert(h5fp%hdferr /= 0)
   end block
+
+  color = me / 2
+  call MPI_Comm_split(MPI_COMM_WORLD, color, me, subcomm, ierr); call check(ierr)
+  block
+    type(t_h5fort_parallel) :: h5fp
+    character(len=32) :: subfile
+
+    write(subfile, '(a,i0,a)') "test-subcomm-", color, ".h5"
+    h5fp%comm = subcomm
+    h5fp%transfer_mode = H5FORTRAN_XFER_INDEPENDENT
+    h5fp%f_name = trim(subfile)
+    call h5fp%open(H5FORTRAN_FORCE_WRITE); call check(h5fp%hdferr)
+    call h5fp%write("/integer64", int64_local); call check(h5fp%hdferr)
+    call h5fp%close(); call check(h5fp%hdferr)
+    call h5fp%open(H5FORTRAN_READ_ONLY); call check(h5fp%hdferr)
+    call h5fp%read("/integer64", int64_read); call check(h5fp%hdferr)
+    call assert(all(int64_read == int64_local))
+    call h5fp%close(); call check(h5fp%hdferr)
+  end block
+  call MPI_Comm_free(subcomm, ierr); call check(ierr)
 
   call h5close_f(hdferr); call check(hdferr)
 

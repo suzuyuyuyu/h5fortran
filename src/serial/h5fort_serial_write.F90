@@ -27,6 +27,11 @@ module h5fort_serial_write
   public :: h5fort_write_i32_2d
   public :: h5fort_write_i32_3d
   public :: h5fort_write_i32_4d
+  public :: h5fort_write_i64_0d
+  public :: h5fort_write_i64_1d
+  public :: h5fort_write_i64_2d
+  public :: h5fort_write_i64_3d
+  public :: h5fort_write_i64_4d
   public :: h5fort_write_str_0d
   public :: h5fort_write_lgc_0d
   public :: h5fort_write_lgc_1d
@@ -192,7 +197,7 @@ contains
   end subroutine create_scalar_dataset
 
   !============================================================================
-  ! real64 / real32 / int32 — scalar (0D)
+  ! real64 / real32 / int32 / int64 — scalar (0D)
   !============================================================================
   subroutine h5fort_write_r64_0d(file_id, dset_path, scalar, hdferr, mode, attrs, units)
     integer(hid_t),    intent(in)  :: file_id
@@ -263,9 +268,9 @@ contains
     integer          :: err_local, mode_
     dims  = [1_hsize_t]
     mode_ = 0; if (present(mode)) mode_ = mode
-    call create_scalar_dataset(file_id, dset_path, H5T_NATIVE_INTEGER, dset_id, hdferr, mode_)
+    call create_scalar_dataset(file_id, dset_path, h5kind_to_type(int32, H5_INTEGER_KIND), dset_id, hdferr, mode_)
     if (hdferr /= 0) return
-    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, scalar, dims, hdferr)
+    call h5dwrite_f(dset_id, h5kind_to_type(int32, H5_INTEGER_KIND), scalar, dims, hdferr)
     call h5dclose_f(dset_id, err_local)
     call record_error(hdferr, err_local)
     if (present(attrs)) then
@@ -278,9 +283,37 @@ contains
     end if
   end subroutine h5fort_write_i32_0d
 
+  subroutine h5fort_write_i64_0d(file_id, dset_path, scalar, hdferr, mode, attrs, units)
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    integer(int64),         intent(in)  :: scalar
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+    integer(hid_t)   :: dset_id
+    integer(hsize_t) :: dims(1)
+    integer          :: err_local, mode_
+    dims  = [1_hsize_t]
+    mode_ = 0; if (present(mode)) mode_ = mode
+    call create_scalar_dataset(file_id, dset_path, h5kind_to_type(int64, H5_INTEGER_KIND), dset_id, hdferr, mode_)
+    if (hdferr /= 0) return
+    call h5dwrite_f(dset_id, h5kind_to_type(int64, H5_INTEGER_KIND), scalar, dims, hdferr)
+    call h5dclose_f(dset_id, err_local)
+    call record_error(hdferr, err_local)
+    if (present(attrs)) then
+      call h5fort_swrite_attr(file_id, dset_path, attrs, err_local)
+      call record_error(hdferr, err_local)
+    end if
+    if (present(units)) then
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
+      call record_error(hdferr, err_local)
+    end if
+  end subroutine h5fort_write_i64_0d
+
 
   !============================================================================
-  ! real64 / real32 / int32 — arrays (1D–4D)
+  ! real64 / real32 / int32 / int64 — arrays (1D–4D)
   !============================================================================
   subroutine h5fort_write_r64_1d(file_id, dset_path, array, hdferr, mode, attrs, units)
     integer(hid_t),    intent(in)  :: file_id
@@ -519,9 +552,9 @@ contains
     integer          :: err_local, mode_
     dims  = shape(array, kind=hsize_t)
     mode_ = 0; if (present(mode)) mode_ = mode
-    call create_dataset(file_id, dset_path, H5T_NATIVE_INTEGER, 1, dims, dset_id, hdferr, mode_)
+    call create_dataset(file_id, dset_path, h5kind_to_type(int32, H5_INTEGER_KIND), 1, dims, dset_id, hdferr, mode_)
     if (hdferr /= 0) return
-    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, array, dims, hdferr)
+    call h5dwrite_f(dset_id, h5kind_to_type(int32, H5_INTEGER_KIND), array, dims, hdferr)
     call h5dclose_f(dset_id, err_local)
     call record_error(hdferr, err_local)
     if (present(attrs)) then
@@ -547,9 +580,9 @@ contains
     integer          :: err_local, mode_
     dims  = shape(array, kind=hsize_t)
     mode_ = 0; if (present(mode)) mode_ = mode
-    call create_dataset(file_id, dset_path, H5T_NATIVE_INTEGER, 2, dims, dset_id, hdferr, mode_)
+    call create_dataset(file_id, dset_path, h5kind_to_type(int32, H5_INTEGER_KIND), 2, dims, dset_id, hdferr, mode_)
     if (hdferr /= 0) return
-    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, array, dims, hdferr)
+    call h5dwrite_f(dset_id, h5kind_to_type(int32, H5_INTEGER_KIND), array, dims, hdferr)
     call h5dclose_f(dset_id, err_local)
     call record_error(hdferr, err_local)
     if (present(attrs)) then
@@ -575,9 +608,9 @@ contains
     integer          :: err_local, mode_
     dims  = shape(array, kind=hsize_t)
     mode_ = 0; if (present(mode)) mode_ = mode
-    call create_dataset(file_id, dset_path, H5T_NATIVE_INTEGER, 3, dims, dset_id, hdferr, mode_)
+    call create_dataset(file_id, dset_path, h5kind_to_type(int32, H5_INTEGER_KIND), 3, dims, dset_id, hdferr, mode_)
     if (hdferr /= 0) return
-    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, array, dims, hdferr)
+    call h5dwrite_f(dset_id, h5kind_to_type(int32, H5_INTEGER_KIND), array, dims, hdferr)
     call h5dclose_f(dset_id, err_local)
     call record_error(hdferr, err_local)
     if (present(attrs)) then
@@ -603,9 +636,9 @@ contains
     integer          :: err_local, mode_
     dims  = shape(array, kind=hsize_t)
     mode_ = 0; if (present(mode)) mode_ = mode
-    call create_dataset(file_id, dset_path, H5T_NATIVE_INTEGER, 4, dims, dset_id, hdferr, mode_)
+    call create_dataset(file_id, dset_path, h5kind_to_type(int32, H5_INTEGER_KIND), 4, dims, dset_id, hdferr, mode_)
     if (hdferr /= 0) return
-    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, array, dims, hdferr)
+    call h5dwrite_f(dset_id, h5kind_to_type(int32, H5_INTEGER_KIND), array, dims, hdferr)
     call h5dclose_f(dset_id, err_local)
     call record_error(hdferr, err_local)
     if (present(attrs)) then
@@ -617,6 +650,118 @@ contains
       call record_error(hdferr, err_local)
     end if
   end subroutine h5fort_write_i32_4d
+
+  subroutine h5fort_write_i64_1d(file_id, dset_path, array, hdferr, mode, attrs, units)
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    integer(int64),         intent(in)  :: array(:)
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+    integer(hid_t)   :: dset_id
+    integer(hsize_t) :: dims(1)
+    integer          :: err_local, mode_
+    dims  = shape(array, kind=hsize_t)
+    mode_ = 0; if (present(mode)) mode_ = mode
+    call create_dataset(file_id, dset_path, h5kind_to_type(int64, H5_INTEGER_KIND), 1, dims, dset_id, hdferr, mode_)
+    if (hdferr /= 0) return
+    call h5dwrite_f(dset_id, h5kind_to_type(int64, H5_INTEGER_KIND), array, dims, hdferr)
+    call h5dclose_f(dset_id, err_local)
+    call record_error(hdferr, err_local)
+    if (present(attrs)) then
+      call h5fort_swrite_attr(file_id, dset_path, attrs, err_local)
+      call record_error(hdferr, err_local)
+    end if
+    if (present(units)) then
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
+      call record_error(hdferr, err_local)
+    end if
+  end subroutine h5fort_write_i64_1d
+
+  subroutine h5fort_write_i64_2d(file_id, dset_path, array, hdferr, mode, attrs, units)
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    integer(int64),         intent(in)  :: array(:, :)
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+    integer(hid_t)   :: dset_id
+    integer(hsize_t) :: dims(2)
+    integer          :: err_local, mode_
+    dims  = shape(array, kind=hsize_t)
+    mode_ = 0; if (present(mode)) mode_ = mode
+    call create_dataset(file_id, dset_path, h5kind_to_type(int64, H5_INTEGER_KIND), 2, dims, dset_id, hdferr, mode_)
+    if (hdferr /= 0) return
+    call h5dwrite_f(dset_id, h5kind_to_type(int64, H5_INTEGER_KIND), array, dims, hdferr)
+    call h5dclose_f(dset_id, err_local)
+    call record_error(hdferr, err_local)
+    if (present(attrs)) then
+      call h5fort_swrite_attr(file_id, dset_path, attrs, err_local)
+      call record_error(hdferr, err_local)
+    end if
+    if (present(units)) then
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
+      call record_error(hdferr, err_local)
+    end if
+  end subroutine h5fort_write_i64_2d
+
+  subroutine h5fort_write_i64_3d(file_id, dset_path, array, hdferr, mode, attrs, units)
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    integer(int64),         intent(in)  :: array(:, :, :)
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+    integer(hid_t)   :: dset_id
+    integer(hsize_t) :: dims(3)
+    integer          :: err_local, mode_
+    dims  = shape(array, kind=hsize_t)
+    mode_ = 0; if (present(mode)) mode_ = mode
+    call create_dataset(file_id, dset_path, h5kind_to_type(int64, H5_INTEGER_KIND), 3, dims, dset_id, hdferr, mode_)
+    if (hdferr /= 0) return
+    call h5dwrite_f(dset_id, h5kind_to_type(int64, H5_INTEGER_KIND), array, dims, hdferr)
+    call h5dclose_f(dset_id, err_local)
+    call record_error(hdferr, err_local)
+    if (present(attrs)) then
+      call h5fort_swrite_attr(file_id, dset_path, attrs, err_local)
+      call record_error(hdferr, err_local)
+    end if
+    if (present(units)) then
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
+      call record_error(hdferr, err_local)
+    end if
+  end subroutine h5fort_write_i64_3d
+
+  subroutine h5fort_write_i64_4d(file_id, dset_path, array, hdferr, mode, attrs, units)
+    integer(hid_t),    intent(in)  :: file_id
+    character(len=*),  intent(in)  :: dset_path
+    integer(int64),         intent(in)  :: array(:, :, :, :)
+    integer,           intent(out) :: hdferr
+    integer,           intent(in), optional :: mode
+    type(t_hdf5_attr), intent(in), optional :: attrs(:)
+    character(len=*),  intent(in), optional :: units
+    integer(hid_t)   :: dset_id
+    integer(hsize_t) :: dims(4)
+    integer          :: err_local, mode_
+    dims  = shape(array, kind=hsize_t)
+    mode_ = 0; if (present(mode)) mode_ = mode
+    call create_dataset(file_id, dset_path, h5kind_to_type(int64, H5_INTEGER_KIND), 4, dims, dset_id, hdferr, mode_)
+    if (hdferr /= 0) return
+    call h5dwrite_f(dset_id, h5kind_to_type(int64, H5_INTEGER_KIND), array, dims, hdferr)
+    call h5dclose_f(dset_id, err_local)
+    call record_error(hdferr, err_local)
+    if (present(attrs)) then
+      call h5fort_swrite_attr(file_id, dset_path, attrs, err_local)
+      call record_error(hdferr, err_local)
+    end if
+    if (present(units)) then
+      call h5fort_write_attribute(file_id, dset_path, "units", units, err_local)
+      call record_error(hdferr, err_local)
+    end if
+  end subroutine h5fort_write_i64_4d
 
 
   !============================================================================

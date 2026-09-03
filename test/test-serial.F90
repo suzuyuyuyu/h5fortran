@@ -1,7 +1,7 @@
 program test_serial
   use hdf5
   use h5fort
-  use, intrinsic :: iso_fortran_env, only: int32, real32, real64
+  use, intrinsic :: iso_fortran_env, only: int32, int64, real32, real64
   implicit none
 
   type(t_h5fort_serial) :: file, invalid
@@ -12,10 +12,13 @@ program test_serial
   real(real64) :: r64_scalar, r64_1d(3), r64_2d(2, 3), r64_3d(2, 2, 2), r64_4d(2, 2, 2, 2)
   real(real32) :: r32_1d(2)
   integer(int32) :: i32_2d(2, 2)
+  integer(int64) :: i64_1d(3)
   logical :: logical_2d(2, 2), logical_fixed(2, 2)
   real(real64), allocatable :: got_1d(:), got_2d(:, :), got_3d(:, :, :), got_4d(:, :, :, :)
   real(real32), allocatable :: got_r32(:)
   integer(int32), allocatable :: got_i32(:, :)
+  integer(int64), allocatable :: got_i64(:), dataset_shape(:)
+  integer :: dataset_rank
   logical, allocatable :: got_logical(:, :)
   character(len=:), allocatable :: got_text
   character(len=:), allocatable :: got_attr
@@ -36,6 +39,7 @@ program test_serial
   r64_4d = reshape([(real(i, real64), i = 1, size(r64_4d))], shape(r64_4d))
   r32_1d = [1.25_real32, 2.5_real32]
   i32_2d = reshape([1_int32, 2_int32, 3_int32, 4_int32], shape(i32_2d))
+  i64_1d = [1_int64, 2147483648_int64, huge(1_int64)]
   logical_2d = reshape([.true., .false., .false., .true.], shape(logical_2d))
   attrs(1) = t_hdf5_attr("description", "serial test")
 
@@ -49,6 +53,7 @@ program test_serial
   call file%write("/rank/four", r64_4d); call check(file%hdferr, "rank 4")
   call file%write("/types/r32", r32_1d); call check(file%hdferr, "real32")
   call file%write("/types/i32", i32_2d); call check(file%hdferr, "int32")
+  call file%write("/types/i64", i64_1d); call check(file%hdferr, "int64")
   call file%write("/types/logical", logical_2d); call check(file%hdferr, "logical")
   call file%write("/types/text", "hello h5fortran"); call check(file%hdferr, "text")
   call file%write("/overwrite", 1_int32); call check(file%hdferr, "initial write")
@@ -66,6 +71,10 @@ program test_serial
   call file%read("/rank/four", got_4d); call check(file%hdferr, "read rank 4")
   call file%read("/types/r32", got_r32); call check(file%hdferr, "read real32")
   call file%read("/types/i32", got_i32); call check(file%hdferr, "read int32")
+  call file%read("/types/i64", got_i64); call check(file%hdferr, "read int64")
+  call h5fort_get_dataset_info(file%file_id, "/rank/two", dataset_rank, dataset_shape, hdferr)
+  call check(hdferr, "dataset info")
+  call assert(dataset_rank == 2 .and. all(dataset_shape == [2_int64, 3_int64]), "dataset rank and shape")
   call file%read("/types/logical", got_logical); call check(file%hdferr, "read logical")
   call file%read_fixed("/types/logical", logical_fixed); call check(file%hdferr, "fixed logical")
   call file%read("/types/text", got_text); call check(file%hdferr, "read text")
@@ -82,6 +91,7 @@ program test_serial
   call assert(all(got_4d == r64_4d), "rank 4 value")
   call assert(all(got_r32 == r32_1d), "real32 value")
   call assert(all(got_i32 == i32_2d), "int32 value")
+  call assert(all(got_i64 == i64_1d), "int64 value")
   call assert(all(got_logical .eqv. logical_2d), "logical value")
   call assert(all(logical_fixed .eqv. logical_2d), "fixed logical value")
   call assert(got_text == "hello h5fortran", "text value")

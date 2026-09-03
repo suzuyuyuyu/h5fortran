@@ -12,6 +12,16 @@ set_target_properties(h5fortran_version PROPERTIES
 
 set(h5fortran_components h5fortran_hdf5 h5fortran_version)
 
+add_library(h5fortran_dataset h5fort_dataset.F90)
+target_link_libraries(h5fortran_dataset PUBLIC h5fortran_hdf5)
+target_include_directories(h5fortran_dataset
+  PUBLIC
+    "$<BUILD_INTERFACE:${H5FORTRAN_MODULE_DIRECTORY}>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/h5fortran>")
+set_target_properties(h5fortran_dataset PROPERTIES
+  Fortran_MODULE_DIRECTORY "${H5FORTRAN_MODULE_DIRECTORY}")
+list(APPEND h5fortran_components h5fortran_dataset)
+
 if(H5FORTRAN_ENABLE_SERIAL)
   add_library(h5fortran_serial
     serial/h5fort_serial_attribute.F90
@@ -74,7 +84,8 @@ set_target_properties(h5fortran PROPERTIES
 install(TARGETS h5fortran ${h5fortran_components}
   EXPORT h5fortranTargets
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 install(DIRECTORY "${H5FORTRAN_MODULE_DIRECTORY}/"
   DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/h5fortran"

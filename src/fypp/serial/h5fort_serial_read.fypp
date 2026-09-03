@@ -23,7 +23,7 @@ module h5fort_serial_read
 contains
 
   !============================================================================
-  ! real64 / real32 / int32 — scalar (0D)
+  ! real64 / real32 / int32 / int64 — scalar (0D)
   !============================================================================
 #:for kname, ftype, h5type in KINDS
   subroutine h5fort_read_${kname}$_0d(file_id, dset_path, scalar, hdferr)
@@ -49,7 +49,7 @@ contains
 #:endfor
 
   !============================================================================
-  ! real64 / real32 / int32 — arrays (1D–4D, allocatable)
+  ! real64 / real32 / int32 / int64 — arrays (1D–4D, allocatable)
   !============================================================================
 #:for kname, ftype, h5type in KINDS
   #:for rank in RANKS

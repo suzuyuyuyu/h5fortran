@@ -1,6 +1,14 @@
+@PACKAGE_INIT@
+
 include(CMakeFindDependencyMacro)
-find_dependency(HDF5 REQUIRED COMPONENTS Fortran HL)
-if(@H5FORTRAN_ENABLE_PARALLEL@)
-  find_dependency(MPI REQUIRED COMPONENTS Fortran)
+set(H5FORTRAN_HAVE_SERIAL @H5FORTRAN_ENABLE_SERIAL@)
+set(H5FORTRAN_HAVE_PARALLEL @H5FORTRAN_ENABLE_PARALLEL@)
+if(H5FORTRAN_HAVE_PARALLEL)
+  set(HDF5_PREFER_PARALLEL ON)
+endif()
+find_dependency(HDF5 COMPONENTS Fortran HL)
+if(H5FORTRAN_HAVE_PARALLEL)
+  find_dependency(MPI COMPONENTS Fortran)
 endif()
 include("${CMAKE_CURRENT_LIST_DIR}/h5fortranTargets.cmake")
+check_required_components(h5fortran)

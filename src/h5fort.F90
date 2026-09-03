@@ -1,6 +1,7 @@
 #include "h5fort_config.inc"
 module h5fort
 
+  use h5fort_dataset, only: h5fort_get_dataset_info
   use h5fort_version, only: H5FORTRAN_VERSION, H5FORTRAN_VERSION_MAJOR, &
     H5FORTRAN_SCHEME_VERSION
 #ifdef H5FORTRAN_PARALLEL
@@ -25,11 +26,13 @@ module h5fort
   integer, parameter, public :: H5FORTRAN_READ_ONLY = 2
   public :: H5FORTRAN_VERSION, H5FORTRAN_VERSION_MAJOR
   public :: H5FORTRAN_SCHEME_VERSION
+  public :: h5fort_get_dataset_info
 
 #ifdef H5FORTRAN_PARALLEL
   public :: h5fort_pwrite, h5fort_pread, h5fort_pread_fixed
   public :: t_h5fort_parallel
   public :: t_phdf5_writer
+  public :: H5FORTRAN_XFER_COLLECTIVE, H5FORTRAN_XFER_INDEPENDENT
 #endif
 
 #ifdef H5FORTRAN_SERIAL

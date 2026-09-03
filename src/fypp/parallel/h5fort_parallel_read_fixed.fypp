@@ -23,13 +23,14 @@ contains
 #:include "check_shape_and_copy.fypp"
 #:for kname, ftype, h5type in KINDS
   #:for rank in RANKS
-  subroutine h5fort_read_${kname}$_${rank}$d_fixed(file_id, dset_path, array, hdferr)
+  subroutine h5fort_read_${kname}$_${rank}$d_fixed(file_id, dset_path, array, hdferr, comm, transfer_mode)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
     ${ftype}$,        intent(out) :: array(${', '.join([':']*rank)}$)
     integer,          intent(out) :: hdferr
+    integer,          intent(in), optional :: comm, transfer_mode
     ${ftype}$, allocatable :: tmp(${', '.join([':']*rank)}$)
-    call h5fort_read_${kname}$_${rank}$d(file_id, dset_path, tmp, hdferr)
+    call h5fort_read_${kname}$_${rank}$d(file_id, dset_path, tmp, hdferr, comm, transfer_mode)
     if (hdferr /= 0) return
     @:CHECK_SHAPE_AND_COPY(parallel, tmp, array)
   end subroutine h5fort_read_${kname}$_${rank}$d_fixed
@@ -38,13 +39,14 @@ contains
 #:endfor
 
 #:for rank in RANKS
-  subroutine h5fort_read_lgc_${rank}$d_fixed(file_id, dset_path, array, hdferr)
+  subroutine h5fort_read_lgc_${rank}$d_fixed(file_id, dset_path, array, hdferr, comm, transfer_mode)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
     logical,          intent(out) :: array(${', '.join([':']*rank)}$)
     integer,          intent(out) :: hdferr
+    integer,          intent(in), optional :: comm, transfer_mode
     logical, allocatable :: tmp(${', '.join([':']*rank)}$)
-    call h5fort_read_lgc_${rank}$d(file_id, dset_path, tmp, hdferr)
+    call h5fort_read_lgc_${rank}$d(file_id, dset_path, tmp, hdferr, comm, transfer_mode)
     if (hdferr /= 0) return
     @:CHECK_SHAPE_AND_COPY(parallel, tmp, array)
   end subroutine h5fort_read_lgc_${rank}$d_fixed

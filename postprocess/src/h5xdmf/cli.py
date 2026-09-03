@@ -5,10 +5,12 @@ from __future__ import annotations
 import argparse
 import glob
 import os
+import sys
 from collections.abc import Sequence
 
 from .indexer import build_manifest, update_manifest
-from .manifest import read_manifest, write_manifest
+from .manifest import prune_manifest, read_manifest, write_manifest
+from .validation import validate_snapshots
 from .xdmf import build_xdmf_files
 
 
@@ -24,6 +26,11 @@ def _parser() -> argparse.ArgumentParser:
         "--generate-only",
         action="store_true",
         help="generate XDMF from an existing manifest without scanning snapshots",
+    )
+    parser.add_argument(
+        "--prune",
+        action="store_true",
+        help="remove missing snapshots from an existing manifest before updating",
     )
     parser.add_argument(
         "--rebuild",
@@ -42,7 +49,20 @@ def _expand_inputs(patterns: Sequence[str]) -> list[str]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    args = _parser().parse_args(argv)
+    argv_ = list(argv) if argv is not None else sys.argv[1:]
+    if argv_ and argv_[0] == "validate":
+        parser = argparse.ArgumentParser(prog="h5xdmf validate")
+        parser.add_argument("inputs", nargs="+", help="HDF5 paths or glob patterns")
+        args = parser.parse_args(argv_[1:])
+        paths = _expand_inputs(args.inputs)
+        failures = validate_snapshots(paths)
+        for path, message in failures:
+            print(f"invalid: {path}: {message}")
+        if not failures:
+            print(f"valid: {len(paths)} snapshot(s)")
+        return 1 if failures else 0
+
+    args = _parser().parse_args(argv_)
     metadata = os.path.abspath(args.metadata)
     manifest_dir = os.path.dirname(metadata)
 
@@ -57,6 +77,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         missing = [path for path in paths if not os.path.isfile(path)]
         if missing:
             _parser().error(f"input does not exist: {missing[0]}")
+        if args.prune and os.path.exists(metadata):
+            prune_manifest(metadata)
         if args.rebuild:
             manifest = build_manifest(paths, relative_to=manifest_dir)
             write_manifest(metadata, manifest)

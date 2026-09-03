@@ -45,7 +45,7 @@
 !   中間グループはhdf5_writeが自動生成する。
 !
 !   対応する配列ランク: scalar, 1D, 2D, 3D, 4D (allocatable および固定長)
-!   対応する型        : real(real64), real(real32), integer(int32), logical (int32で保存), character (スカラーのみ)
+!   対応する型        : real(real64), real(real32), integer(int32/int64), logical (int32で保存), character (スカラーのみ)
 !   属性の書き込み   : hdf5_write_attr(file_id, path, [t_hdf5_attr("name","val"), ...], hdferr)
 !                      hdf5_write の attrs=[ ... ] optional 引数でも同時指定可
 !                      hdf5_write の units="..." optional 引数で単位を直接指定可
@@ -82,6 +82,7 @@ module h5fort_parallel
 
   public :: t_phdf5_writer
   public :: H5FORTRAN_FORCE_WRITE, H5FORTRAN_READ_ONLY
+  public :: H5FORTRAN_XFER_COLLECTIVE, H5FORTRAN_XFER_INDEPENDENT
 
   interface h5fort_pwrite
 #:for kname, ftype, h5type in KINDS
@@ -110,6 +111,9 @@ module h5fort_parallel
     character(len=:), allocatable :: f_name
     integer(hid_t) :: file_id = -1
     integer :: hdferr
+    integer :: comm = MPI_COMM_WORLD
+    integer :: info = MPI_INFO_NULL
+    integer :: transfer_mode = H5FORTRAN_XFER_COLLECTIVE
   contains
     procedure :: open  => h5fort_parallel_open
     procedure :: close => h5fort_parallel_close
@@ -183,7 +187,7 @@ contains
 
     call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, self%hdferr)
     if (self%hdferr /= 0) return
-    call h5pset_fapl_mpio_f(fapl_id, MPI_COMM_WORLD, MPI_INFO_NULL, self%hdferr)
+    call h5pset_fapl_mpio_f(fapl_id, self%comm, self%info, self%hdferr)
     if (self%hdferr /= 0) then
       call h5pclose_f(fapl_id, err_local)
       return
@@ -215,14 +219,14 @@ contains
   end subroutine h5fort_parallel_close
 
   !============================================================================
-  ! write PASS wrappers — real64 / real32 / int32 scalars and arrays
+  ! write PASS wrappers — real64 / real32 / int32 / int64 scalars and arrays
   !============================================================================
 #:for kname, ftype, h5type in KINDS
   subroutine h5fort_parallel_write_${kname}$_0d(self, dset_path, scalar)
     class(t_h5fort_parallel), intent(inout) :: self
     character(len=*), intent(in) :: dset_path
     ${ftype}$, intent(in) :: scalar
-    call h5fort_write_${kname}$_0d(self%file_id, dset_path, scalar, self%hdferr)
+    call h5fort_write_${kname}$_0d(self%file_id, dset_path, scalar, self%hdferr, self%comm, self%transfer_mode)
   end subroutine h5fort_parallel_write_${kname}$_0d
 
   #:for rank in RANKS
@@ -230,7 +234,7 @@ contains
     class(t_h5fort_parallel), intent(inout) :: self
     character(len=*), intent(in) :: dset_path
     ${ftype}$, intent(in) :: array(${', '.join([':']*rank)}$)
-    call h5fort_write_${kname}$_${rank}$d(self%file_id, dset_path, array, self%hdferr)
+    call h5fort_write_${kname}$_${rank}$d(self%file_id, dset_path, array, self%hdferr, self%comm, self%transfer_mode)
   end subroutine h5fort_parallel_write_${kname}$_${rank}$d
 
   #:endfor
@@ -250,7 +254,7 @@ contains
     class(t_h5fort_parallel), intent(inout) :: self
     character(len=*), intent(in) :: dset_path
     logical, intent(in) :: scalar
-    call h5fort_write_lgc_0d(self%file_id, dset_path, scalar, self%hdferr)
+    call h5fort_write_lgc_0d(self%file_id, dset_path, scalar, self%hdferr, self%comm, self%transfer_mode)
   end subroutine h5fort_parallel_write_lgc_0d
 
 #:for rank in RANKS
@@ -258,20 +262,20 @@ contains
     class(t_h5fort_parallel), intent(inout) :: self
     character(len=*), intent(in) :: dset_path
     logical, intent(in) :: array(${', '.join([':']*rank)}$)
-    call h5fort_write_lgc_${rank}$d(self%file_id, dset_path, array, self%hdferr)
+    call h5fort_write_lgc_${rank}$d(self%file_id, dset_path, array, self%hdferr, self%comm, self%transfer_mode)
   end subroutine h5fort_parallel_write_lgc_${rank}$d
 
 #:endfor
 
   !============================================================================
-  ! read PASS wrappers — real64 / real32 / int32 scalars and arrays
+  ! read PASS wrappers — real64 / real32 / int32 / int64 scalars and arrays
   !============================================================================
 #:for kname, ftype, h5type in KINDS
   subroutine h5fort_parallel_read_${kname}$_0d(self, dset_path, scalar)
     class(t_h5fort_parallel), intent(inout) :: self
     character(len=*), intent(in)  :: dset_path
     ${ftype}$,        intent(out) :: scalar
-    call h5fort_read_${kname}$_0d(self%file_id, dset_path, scalar, self%hdferr)
+    call h5fort_read_${kname}$_0d(self%file_id, dset_path, scalar, self%hdferr, self%comm, self%transfer_mode)
   end subroutine h5fort_parallel_read_${kname}$_0d
 
   #:for rank in RANKS
@@ -279,7 +283,7 @@ contains
     class(t_h5fort_parallel), intent(inout) :: self
     character(len=*), intent(in)  :: dset_path
     ${ftype}$, allocatable, intent(out) :: array(${', '.join([':']*rank)}$)
-    call h5fort_read_${kname}$_${rank}$d(self%file_id, dset_path, array, self%hdferr)
+    call h5fort_read_${kname}$_${rank}$d(self%file_id, dset_path, array, self%hdferr, self%comm, self%transfer_mode)
   end subroutine h5fort_parallel_read_${kname}$_${rank}$d
 
   #:endfor
@@ -299,7 +303,7 @@ contains
     class(t_h5fort_parallel), intent(inout) :: self
     character(len=*), intent(in)  :: dset_path
     logical,          intent(out) :: scalar
-    call h5fort_read_lgc_0d(self%file_id, dset_path, scalar, self%hdferr)
+    call h5fort_read_lgc_0d(self%file_id, dset_path, scalar, self%hdferr, self%comm, self%transfer_mode)
   end subroutine h5fort_parallel_read_lgc_0d
 
 #:for rank in RANKS
@@ -307,13 +311,13 @@ contains
     class(t_h5fort_parallel), intent(inout) :: self
     character(len=*),     intent(in)  :: dset_path
     logical, allocatable, intent(out) :: array(${', '.join([':']*rank)}$)
-    call h5fort_read_lgc_${rank}$d(self%file_id, dset_path, array, self%hdferr)
+    call h5fort_read_lgc_${rank}$d(self%file_id, dset_path, array, self%hdferr, self%comm, self%transfer_mode)
   end subroutine h5fort_parallel_read_lgc_${rank}$d
 
 #:endfor
 
   !============================================================================
-  ! read_fixed PASS wrappers — real64 / real32 / int32 (1D–4D)
+  ! read_fixed PASS wrappers — real64 / real32 / int32 / int64 (1D–4D)
   !============================================================================
 #:for kname, ftype, h5type in KINDS
   #:for rank in RANKS
@@ -321,7 +325,7 @@ contains
     class(t_h5fort_parallel), intent(inout) :: self
     character(len=*), intent(in)  :: dset_path
     ${ftype}$,        intent(out) :: array(${', '.join([':']*rank)}$)
-    call h5fort_read_${kname}$_${rank}$d_fixed(self%file_id, dset_path, array, self%hdferr)
+    call h5fort_read_${kname}$_${rank}$d_fixed(self%file_id, dset_path, array, self%hdferr, self%comm, self%transfer_mode)
   end subroutine h5fort_parallel_read_${kname}$_${rank}$d_fixed
 
   #:endfor
@@ -332,7 +336,7 @@ contains
     class(t_h5fort_parallel), intent(inout) :: self
     character(len=*), intent(in)  :: dset_path
     logical,          intent(out) :: array(${', '.join([':']*rank)}$)
-    call h5fort_read_lgc_${rank}$d_fixed(self%file_id, dset_path, array, self%hdferr)
+    call h5fort_read_lgc_${rank}$d_fixed(self%file_id, dset_path, array, self%hdferr, self%comm, self%transfer_mode)
   end subroutine h5fort_parallel_read_lgc_${rank}$d_fixed
 
 #:endfor
