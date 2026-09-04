@@ -6,13 +6,20 @@ program test_serial
 
   type(t_h5fort_serial) :: file, invalid
   type(t_hdf5_attr) :: attrs(1)
-  integer :: i, hdferr
+  integer :: i, object_index, hdferr
   integer(hid_t) :: object_id
+  integer(int64) :: attribute_count
   logical :: exists
+  character(len=9), parameter :: attribute_objects(3) = &
+    [character(len=9) :: "/rank/two", "/rank", "/"]
   real(real64) :: r64_scalar, r64_1d(3), r64_2d(2, 3), r64_3d(2, 2, 2), r64_4d(2, 2, 2, 2)
   real(real32) :: r32_1d(2)
   integer(int32) :: i32_2d(2, 2)
   integer(int64) :: i64_1d(3)
+  real(real64) :: attr_r64_scalar, attr_r64_array(3), got_attr_r64_scalar, got_attr_r64_array(3)
+  real(real32) :: attr_r32_scalar, attr_r32_array(2), got_attr_r32_scalar, got_attr_r32_array(2)
+  integer(int32) :: attr_i32_scalar, attr_i32_array(3), got_attr_i32_scalar, got_attr_i32_array(3)
+  integer(int64) :: attr_i64_scalar, attr_i64_array(2), got_attr_i64_scalar, got_attr_i64_array(2)
   logical :: logical_2d(2, 2), logical_fixed(2, 2)
   real(real64), allocatable :: got_1d(:), got_2d(:, :), got_3d(:, :, :), got_4d(:, :, :, :)
   real(real32), allocatable :: got_r32(:)
@@ -39,6 +46,14 @@ program test_serial
   r32_1d = [1.25_real32, 2.5_real32]
   i32_2d = reshape([1_int32, 2_int32, 3_int32, 4_int32], shape(i32_2d))
   i64_1d = [1_int64, 2147483648_int64, huge(1_int64)]
+  attr_r64_scalar = 1.25_real64
+  attr_r64_array = [-2.0_real64, 0.5_real64, 4.0_real64]
+  attr_r32_scalar = 2.5_real32
+  attr_r32_array = [-1.0_real32, 3.0_real32]
+  attr_i32_scalar = -17_int32
+  attr_i32_array = [1_int32, 2_int32, 4_int32]
+  attr_i64_scalar = 2147483648_int64
+  attr_i64_array = [-1_int64, huge(1_int64)]
   logical_2d = reshape([.true., .false., .false., .true.], shape(logical_2d))
   attrs(1) = t_hdf5_attr("description", "serial test")
 
@@ -61,6 +76,24 @@ program test_serial
   call check(file%hdferr, "update dataset attribute")
   call file%write_attribute("/rank", "description", "rank group")
   call check(file%hdferr, "write group attribute")
+  do object_index = 1, size(attribute_objects)
+    call h5fort_write_attribute(file%file_id, trim(attribute_objects(object_index)), &
+      "r64_scalar", attr_r64_scalar, hdferr); call check(hdferr, "write r64 scalar attribute")
+    call h5fort_write_attribute(file%file_id, trim(attribute_objects(object_index)), &
+      "r64_array", attr_r64_array, hdferr); call check(hdferr, "write r64 array attribute")
+    call h5fort_write_attribute(file%file_id, trim(attribute_objects(object_index)), &
+      "r32_scalar", attr_r32_scalar, hdferr); call check(hdferr, "write r32 scalar attribute")
+    call h5fort_write_attribute(file%file_id, trim(attribute_objects(object_index)), &
+      "r32_array", attr_r32_array, hdferr); call check(hdferr, "write r32 array attribute")
+    call h5fort_write_attribute(file%file_id, trim(attribute_objects(object_index)), &
+      "i32_scalar", attr_i32_scalar, hdferr); call check(hdferr, "write i32 scalar attribute")
+    call h5fort_write_attribute(file%file_id, trim(attribute_objects(object_index)), &
+      "i32_array", attr_i32_array, hdferr); call check(hdferr, "write i32 array attribute")
+    call h5fort_write_attribute(file%file_id, trim(attribute_objects(object_index)), &
+      "i64_scalar", attr_i64_scalar, hdferr); call check(hdferr, "write i64 scalar attribute")
+    call h5fort_write_attribute(file%file_id, trim(attribute_objects(object_index)), &
+      "i64_array", attr_i64_array, hdferr); call check(hdferr, "write i64 array attribute")
+  end do
   call file%close(); call check(file%hdferr, "close after write")
 
   call file%open(H5FORTRAN_READ_ONLY); call check(file%hdferr, "read-only open")
@@ -83,6 +116,38 @@ program test_serial
   call h5fort_read_attribute(file%file_id, "/rank", "description", got_attr, hdferr)
   call check(hdferr, "procedural read group attribute")
   call assert(got_attr == "rank group", "group attribute value")
+  do object_index = 1, size(attribute_objects)
+    call h5fort_read_attribute(file%file_id, trim(attribute_objects(object_index)), &
+      "r64_scalar", got_attr_r64_scalar, hdferr); call check(hdferr, "read r64 scalar attribute")
+    call h5fort_read_attribute(file%file_id, trim(attribute_objects(object_index)), &
+      "r64_array", got_attr_r64_array, hdferr); call check(hdferr, "read r64 array attribute")
+    call h5fort_read_attribute(file%file_id, trim(attribute_objects(object_index)), &
+      "r32_scalar", got_attr_r32_scalar, hdferr); call check(hdferr, "read r32 scalar attribute")
+    call h5fort_read_attribute(file%file_id, trim(attribute_objects(object_index)), &
+      "r32_array", got_attr_r32_array, hdferr); call check(hdferr, "read r32 array attribute")
+    call h5fort_read_attribute(file%file_id, trim(attribute_objects(object_index)), &
+      "i32_scalar", got_attr_i32_scalar, hdferr); call check(hdferr, "read i32 scalar attribute")
+    call h5fort_read_attribute(file%file_id, trim(attribute_objects(object_index)), &
+      "i32_array", got_attr_i32_array, hdferr); call check(hdferr, "read i32 array attribute")
+    call h5fort_read_attribute(file%file_id, trim(attribute_objects(object_index)), &
+      "i64_scalar", got_attr_i64_scalar, hdferr); call check(hdferr, "read i64 scalar attribute")
+    call h5fort_read_attribute(file%file_id, trim(attribute_objects(object_index)), &
+      "i64_array", got_attr_i64_array, hdferr); call check(hdferr, "read i64 array attribute")
+    call assert(got_attr_r64_scalar == attr_r64_scalar .and. &
+      all(got_attr_r64_array == attr_r64_array), "r64 attribute values")
+    call assert(got_attr_r32_scalar == attr_r32_scalar .and. &
+      all(got_attr_r32_array == attr_r32_array), "r32 attribute values")
+    call assert(got_attr_i32_scalar == attr_i32_scalar .and. &
+      all(got_attr_i32_array == attr_i32_array), "i32 attribute values")
+    call assert(got_attr_i64_scalar == attr_i64_scalar .and. &
+      all(got_attr_i64_array == attr_i64_array), "i64 attribute values")
+    call h5fort_get_attribute_info(file%file_id, trim(attribute_objects(object_index)), &
+      "r64_scalar", attribute_count, hdferr); call check(hdferr, "scalar attribute info")
+    call assert(attribute_count == 1_int64, "scalar attribute count")
+    call h5fort_get_attribute_info(file%file_id, trim(attribute_objects(object_index)), &
+      "r64_array", attribute_count, hdferr); call check(hdferr, "array attribute info")
+    call assert(attribute_count == size(attr_r64_array, kind=int64), "array attribute count")
+  end do
 
   call assert(all(got_1d == r64_1d), "rank 1 value")
   call assert(all(got_2d == r64_2d), "rank 2 value")
@@ -110,6 +175,11 @@ program test_serial
     real(real64) :: wrong_shape(1, 1)
     call file%read_fixed("/rank/two", wrong_shape)
     call assert(file%hdferr /= 0, "shape mismatch must fail")
+  end block
+  block
+    real(real64) :: wrong_attribute_length(2)
+    call h5fort_read_attribute(file%file_id, "/", "r64_array", wrong_attribute_length, hdferr)
+    call assert(hdferr /= 0, "attribute length mismatch must fail")
   end block
   call file%write("/read-only-write", r64_1d)
   call assert(file%hdferr /= 0, "write through read-only handle must fail")

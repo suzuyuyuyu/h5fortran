@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Serial公開属性genericへ4種の数値型のscalar・1D配列読み書きと要素数取得を追加した。
 - `h5xdmf`を独立リポジトリへ分離し、製品SemVerとHDF5 scheme versionを独立させた。
 
 ## v1.1.0

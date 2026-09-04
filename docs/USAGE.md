@@ -86,6 +86,24 @@ call h5fort_read_attribute(file_id, "/value", "units", units, hdferr)
 call h5fort_get_dataset_info(file_id, "/value", dataset_rank, dataset_shape, hdferr)
 ```
 
+数値 attribute はscalarと1D配列に同じ generic を使います。配列長が未知の場合は、
+先に要素数を取得して呼び出し側で配列を確保します。
+
+```fortran
+use iso_fortran_env, only: int64, real64
+integer(int64) :: attribute_count
+real(real64), allocatable :: bounds(:)
+
+call h5fort_write_attribute(file_id, "/value", "time", 0.5_real64, hdferr)
+call h5fort_write_attribute(file_id, "/value", "bounds", [0.0_real64, 1.0_real64], hdferr)
+
+call h5fort_get_attribute_info(file_id, "/value", "bounds", attribute_count, hdferr)
+allocate(bounds(attribute_count))
+call h5fort_read_attribute(file_id, "/value", "bounds", bounds, hdferr)
+```
+
+配列長が保存済み属性と異なる場合、読み込みはデータを転送せず失敗します。
+
 ## Parallel: OOP API
 
 MPI 初期化後、全 rank が同じ順序で `open` / `write` / `read` / `close` を呼びます。配列の最終次元が rank 間で分割され、それ以外の次元は全 rank で一致している必要があります。

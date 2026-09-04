@@ -31,10 +31,19 @@ HDF5を読める。XDMFの`Version="3.0"`は外部規格の版であり、製品
 | `logical` | yes | yes |
 | scalar `character` | yes | no |
 | 文字列属性・`units` | read / write | no |
+| 数値属性 (`real32/64`, `int32/64`) | scalar / 1D read / write | no |
 
 公開する手続き generic は Serial の `h5fort_swrite` / `h5fort_sread` / `h5fort_sread_fixed` と、Parallel の `h5fort_pwrite` / `h5fort_pread` / `h5fort_pread_fixed` である。対応する OOP type は `t_h5fort_serial` と `t_h5fort_parallel` である。
 
-Serial の文字列 attribute は dataset、group、root group を対象にできる。OOP API は `write_attribute` / `read_attribute`、手続き API は `h5fort_write_attribute` / `h5fort_read_attribute` とする。既存の複数 attribute 書き込み API `h5fort_swrite_attr` は互換性のため維持する。dataset の `write(..., attrs=..., units=...)` は同じ attribute 実装へ委譲する。
+Serial の attribute は dataset、group、root group を対象にできる。手続き API の
+`h5fort_write_attribute` / `h5fort_read_attribute` は generic とし、文字列に加えて
+`real(real64)`、`real(real32)`、`integer(int32)`、`integer(int64)` のscalarと1D配列を扱う。
+数値scalarはscalar dataspace、数値配列は要素数を長さとする1D dataspaceに保存し、
+配列読み込みでは呼び出し側の配列長が一致しなければ失敗する。
+`h5fort_get_attribute_info(file_id, obj_path, name, count, hdferr)` は読み込み前に属性の
+要素数を `integer(int64)` で返す。文字列用OOP APIは `write_attribute` / `read_attribute`
+とする。既存の複数attribute書き込みAPI `h5fort_swrite_attr` は互換性のため維持する。
+dataset の `write(..., attrs=..., units=...)` は同じ文字列attribute実装へ委譲する。
 
 ## ファイル mode
 
