@@ -20,8 +20,8 @@ cmake --build "${build_dir}" --target example_visualization
 )
 
 (
-  cd "${repo_dir}/postprocess"
-  uv run h5xdmf "${example_dir}/result/seq*.h5" \
+  cd "${example_dir}"
+  h5xdmf "${example_dir}/result/seq*.h5" \
     --metadata "${example_dir}/result/metadata.h5" \
     --outdir "${example_dir}/result" \
     --rebuild

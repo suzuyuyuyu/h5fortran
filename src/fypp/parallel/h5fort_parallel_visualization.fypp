@@ -17,7 +17,7 @@
 #:include "common.fypp"
 #!
 #! This file is the source of src/parallel/h5fort_parallel_visualization.F90.
-#! It writes the product-major HDF5 scheme consumed by postprocess.
+#! It writes the versioned HDF5 scheme consumed by h5xdmf.
 #!
 
 ! DO NOT EDIT — generated from src/fypp/parallel/h5fort_parallel_visualization.fypp

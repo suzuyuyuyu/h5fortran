@@ -9,7 +9,6 @@
 - `src/h5fort.F90`: Serial/Parallel公開APIのfacade
 - `test/`: Serial、Parallel、Visualization HDF5、install consumerのテスト
 - `example/`: Serial/Parallelの手続き・OOP APIと可視化出力の独立した利用例
-- `postprocess/`: snapshot HDF5の索引化とXDMF3生成を行うPython package
 - `docs/`: API、可視化schema、ポストプロセス、テスト、TODO
 
 生成元と生成物は次で同期を確認する。
@@ -102,7 +101,8 @@ ghost cellは出力しない。重複nodeを結合する場合はParaViewの `Cl
 ## 残る課題
 
 優先度は [TODO.md](TODO.md) と
-[`postprocess/docs/ROADMAP.md`](../postprocess/docs/ROADMAP.md) を参照する。
+独立した[`h5xdmf`のROADMAP](https://github.com/suzuyuyuyu/h5xdmf/blob/main/docs/ROADMAP.md)
+を参照する。
 
 特に実運用前に検討するもの:
 

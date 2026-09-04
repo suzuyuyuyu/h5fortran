@@ -23,20 +23,11 @@ ctest --test-dir build --output-on-failure
 
 MPI test は CMake が検出した `MPIEXEC_EXECUTABLE` と `MPIEXEC_NUMPROC_FLAG` を使う。実行環境が socket 作成や process spawn を禁止している場合、Parallel test のみ実行環境側の許可が必要になる。
 
-Pythonポストプロセスのテストは次のように実行する。
-
-```sh
-cd postprocess
-uv sync
-uv run pytest
-```
-
-対象はscheme v1のread/write、manifestの新規作成・増分更新、schema driftの拒否、
-XDMF生成、空粒子stepのSpatial Collection表現、CLI、
-Tetrahedron・Quadrilateral・Triangleのmetadata roundtrip、Python distributionと
-moduleのバージョン一致、製品majorとPython/Fortranのscheme version一致である。
+Pythonポストプロセスの単体テストは独立した`h5xdmf`リポジトリで実行する。
 
 Fortranからポストプロセスまでの完成形は次で確認する。
+
+事前に`h5xdmf`をPATH上へインストールする。
 
 ```sh
 example/visualization/generate.sh build

@@ -13,16 +13,6 @@
     - 可視化以外の診断量を単一HDF5へ蓄積する明確な要求が生じた場合だけ検討する。
 - [?] serial のなかに `__partition__` と拡張可能データセット `data` のセットを出力し、parallel に読み込めるようなデータグループを書き出すためのサブルーチンを作成する
 
-## h5xdmf (postprocess)
-- [x] HDF5 schemaを明示的に検査する `h5xdmf validate`
-- [] 書き込み途中のsnapshotを除外する完了markerまたは一時名運用
-    - markerを可視化writerの`close`で立てる案は、同じsnapshotをugrid/polydataで
-      複数回openする現在の運用では途中状態の定義が曖昧になるため保留する。
-      solver側で一時名から最終名へatomic renameする契約も含めて別途設計する。
-- [x] snapshot削除後にmanifestから存在しないstepを除く `--prune`
-- [?] 同一mesh名の複数空間ブロックまたはAMR
-    - 実際に必要になった場合、h5xdmf Version 0.2としてmetadata schemaを設計する。
-
 ## h5c/h5cpp 設計レビューで見つかった h5fortran 側の課題
 
 `h5c` の設計検討（2026-08-18）で HDF5 C API と比較した際に気づいた点。
@@ -81,7 +71,7 @@
       HDF5 の I32→I8 変換が入る（動作上の問題はない）。
 - [x] Tensor6 の成分順序が文書化されていない
     - `write_field_metadata_` は `ncomp` から `Scalar|Vector|Tensor6|Tensor` を決めるが、
-      `ncomp=6` のときの成分の並び順が `docs/` にも `postprocess/` にも書かれていない。
+      `ncomp=6` のときの成分の並び順が文書化されていない。
       XDMF3 の `Tensor6` は `XX, XY, XZ, YY, YZ, ZZ` の順と定められており、
       これに従っていない場合はテンソル不変量の計算が壊れる。
     - 現状の実装がどの順を前提としているかを確認し、`SPEC.md` に明記するのが望ましい。

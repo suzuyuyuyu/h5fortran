@@ -46,8 +46,8 @@ cmake --build build --target examples
 APIの詳細は [docs/USAGE.md](docs/USAGE.md) を参照してください。
 
 可視化用HDF5のレイアウトと、HDF5時系列からXDMF3を生成するPythonツールは
-[docs/USAGE-visualization.md](docs/USAGE-visualization.md) と
-[`postprocess`](postprocess/) を参照してください。
+[docs/USAGE-visualization.md](docs/USAGE-visualization.md) と独立リポジトリ
+[`h5xdmf`](https://github.com/suzuyuyuyu/h5xdmf) を参照してください。
 snapshot、manifest、XDMFの責務は
 [docs/POSTPROCESS.md](docs/POSTPROCESS.md) にまとめています。
 完成した出力構成を生成する例は

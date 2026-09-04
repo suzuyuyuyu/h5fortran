@@ -24,8 +24,7 @@ program test_serial
   character(len=:), allocatable :: got_attr
 
   call assert(len_trim(H5FORTRAN_VERSION) > 0, "product version is available")
-  call assert(H5FORTRAN_VERSION_MAJOR == H5FORTRAN_SCHEME_VERSION, &
-              "product major and scheme version must match")
+  call assert(H5FORTRAN_SCHEME_VERSION == 1, "visualization writer uses scheme 1")
 
   call h5open_f(hdferr); call check(hdferr, "HDF5 initialization")
 

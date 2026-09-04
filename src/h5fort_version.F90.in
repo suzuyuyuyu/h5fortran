@@ -4,6 +4,6 @@ module h5fort_version
 
   character(len=*), parameter, public :: H5FORTRAN_VERSION = "@PROJECT_VERSION@"
   integer, parameter, public :: H5FORTRAN_VERSION_MAJOR = @PROJECT_VERSION_MAJOR@
-  integer, parameter, public :: H5FORTRAN_SCHEME_VERSION = H5FORTRAN_VERSION_MAJOR
+  integer, parameter, public :: H5FORTRAN_SCHEME_VERSION = 1
 
 end module h5fort_version

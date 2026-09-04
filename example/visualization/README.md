@@ -45,7 +45,11 @@ hydrostatic gradientへ進行波を重ねた `Pressure`、時間変化する渦�
 
 ## 実行
 
-最初にParallel HDF5を使ってCMakeをconfigureする。
+最初に独立ツール`h5xdmf`をインストールし、Parallel HDF5を使ってCMakeをconfigureする。
+
+```sh
+uv tool install ../h5xdmf
+```
 
 ```sh
 cmake -S . -B build \
@@ -99,9 +103,8 @@ node offsetを加えている。
 ## ポストプロセスだけ再実行
 
 ```sh
-cd postprocess
-uv run h5xdmf "../example/visualization/result/seq*.h5" \
-  --metadata ../example/visualization/result/metadata.h5 \
-  --outdir ../example/visualization/result \
+h5xdmf "example/visualization/result/seq*.h5" \
+  --metadata example/visualization/result/metadata.h5 \
+  --outdir example/visualization/result \
   --rebuild
 ```

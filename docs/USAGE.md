@@ -10,8 +10,8 @@ print *, H5FORTRAN_VERSION_MAJOR
 print *, H5FORTRAN_SCHEME_VERSION
 ```
 
-`H5FORTRAN_SCHEME_VERSION`は製品majorと一致する。HDF5 readerはファイルrootの
-`scheme_version`属性を読み、対応するschemeを選ぶ。
+`H5FORTRAN_SCHEME_VERSION`は製品SemVerとは独立した可視化HDF5形式の版である。
+readerはファイルrootの`scheme_version`属性を読み、対応するschemeを選ぶ。
 
 ## Serial: OOP API
 

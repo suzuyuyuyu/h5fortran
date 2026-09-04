@@ -107,7 +107,7 @@ manifestでは分割せず、root直下の各mesh groupを1つの論理meshと�
 
 通常は `M == N` である。`step_index` を持つため、特定のmeshが存在しないstepも表現
 できる。scheme v1は同じmesh名の複数空間ブロックやAMRを扱わない。必要になった場合
-にh5xdmf Version 0.2の機能としてmetadata schemaを設計する。
+にHDF5 scheme version 2としてmetadata schemaを設計する。
 
 connectivityのMPI rank offsetはmetadataでは計算しない。Fortran writerが
 `MPI_Allgather` で各rankの節点数を集め、HDF5へ書く前にrank-local connectivityへ
@@ -116,11 +116,7 @@ connectivityのMPI rank offsetはmetadataでは計算しない。Fortran writer�
 ## 実行
 
 ```sh
-cd postprocess
-uv sync
-uv run h5xdmf "../result/seq*.h5" \
-  --metadata ../result/metadata.h5 \
-  --outdir ../result
+h5xdmf "result/seq*.h5" --metadata result/metadata.h5 --outdir result
 ```
 
 - 通常実行: 新しいsnapshotだけをmanifestへ追加してXDMFを生成
@@ -131,7 +127,7 @@ uv run h5xdmf "../result/seq*.h5" \
 snapshotのschemaだけを検査する場合は次を実行する。
 
 ```sh
-uv run h5xdmf validate "../result/seq*.h5"
+h5xdmf validate "result/seq*.h5"
 ```
 
 ## 完成形のexample

@@ -2,7 +2,7 @@
 
 `t_phdf5_writer` は全MPI rankのmeshとfieldを一つのHDF5ファイルへ集合的に
 書きます。Fortran側ではXDMF/XMLを生成しません。HDF5時系列を出力した後、
-[`postprocess`](../postprocess/) でXDMF3を生成します。
+独立ツール[`h5xdmf`](https://github.com/suzuyuyuyu/h5xdmf)でXDMF3を生成します。
 
 snapshot HDF5を正本とし、`metadata.h5` はPythonが作る再生成可能な索引とする。
 ソルバーは `metadata.h5` へ追記しない。
@@ -140,14 +140,11 @@ geometryは `real(real32/real64/real128)`、connectivityは
 
 ## XDMFの生成
 
-Python 3.10以上と `uv` を用意し、リポジトリrootから実行します。
+Python 3.10以上と`uv`を用意し、h5xdmfをインストールして実行します。
 
 ```sh
-cd postprocess
-uv sync
-uv run h5xdmf "../result/seq*.h5" \
-  --metadata ../result/metadata.h5 \
-  --outdir ../result
+uv tool install ../h5xdmf
+h5xdmf "result/seq*.h5" --metadata result/metadata.h5 --outdir result
 ```
 
 初回は各snapshotのmetadataだけを一度走査して `metadata.h5` を作ります。

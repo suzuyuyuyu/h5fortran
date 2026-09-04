@@ -1,5 +1,9 @@
 # 変更履歴
 
+## Unreleased
+
+- `h5xdmf`を独立リポジトリへ分離し、製品SemVerとHDF5 scheme versionを独立させた。
+
 ## v1.1.0
 
 - 汎用Serial/Parallel APIへ`integer(int64)`を追加した。

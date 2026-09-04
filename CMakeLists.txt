@@ -1,8 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
-include(cmake/h5fortranVersion.cmake)
 project(
     h5fortran
-    VERSION "${H5FORTRAN_VERSION}"
+    VERSION 1.1.0
     DESCRIPTION "Fortran interface to HDF5"
     LANGUAGES Fortran
 )
