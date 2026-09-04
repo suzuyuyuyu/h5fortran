@@ -133,6 +133,8 @@ call writer%close()
 
 2D fieldには `attribute_type=Vector|Tensor6|Tensor` 属性も書かれます。対応成分数は
 3、6、9です。1D fieldは `Scalar` です。
+`Tensor6` の成分順序は `XX, YY, ZZ, XY, YZ, XZ` です。理由とXDMF3仕様との差異は
+[SPEC.md](SPEC.md) を参照してください。
 
 geometryは `real(real32/real64/real128)`、connectivityは
 `integer(int8/int16/int32/int64)`、point/cell dataはこれら7 kindの1D/2Dに

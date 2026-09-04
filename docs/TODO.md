@@ -72,6 +72,6 @@
 - [x] Tensor6 の成分順序が文書化されていない
     - `write_field_metadata_` は `ncomp` から `Scalar|Vector|Tensor6|Tensor` を決めるが、
       `ncomp=6` のときの成分の並び順が文書化されていない。
-      XDMF3 の `Tensor6` は `XX, XY, XZ, YY, YZ, ZZ` の順と定められており、
-      これに従っていない場合はテンソル不変量の計算が壊れる。
-    - 現状の実装がどの順を前提としているかを確認し、`SPEC.md` に明記するのが望ましい。
+    - `h5xdmf`は列を並べ替えずParaView/VTKへ渡すため、XDMF3仕様文の
+      `XX, XY, XZ, YY, YZ, ZZ`ではなく、ParaView/VTKが期待する
+      `XX, YY, ZZ, XY, YZ, XZ`に合わせる必要があることが判明した。`SPEC.md`を訂正済み。

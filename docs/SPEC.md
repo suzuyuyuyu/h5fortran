@@ -110,8 +110,13 @@ root属性は `scheme_version` と `time`、mesh group属性は `topology_type` 
 geometry は real32/real64/real128、connectivity は int8/int16/int32/int64、
 point/cell data はこれら7 kindの1D・2Dに対応する。
 
-`attribute_type=Tensor6`（成分数6）の成分順序はXDMF 3に従い、
-`XX, XY, XZ, YY, YZ, ZZ` とする。利用者はこの順序で第1次元を構成しなければならない。
+`attribute_type=Tensor6`（成分数6）の成分順序はParaView/VTKの対称テンソル規約に合わせ、
+`XX, YY, ZZ, XY, YZ, XZ` とする。利用者はこの順序で第1次元を構成しなければならない。
+`h5xdmf`はテンソルデータを並べ替えず、`AttributeType="Tensor6"`を指定して保存済みの列を
+そのまま指す`DataItem`を生成するため、列0〜5の順序はそのままParaViewへ渡る。したがって
+ここで優先すべきなのはXDMF3仕様文の`XX, XY, XZ, YY, YZ, ZZ`ではなく、読み手である
+ParaView/VTKが期待する順序である。XDMF3仕様とは異なるが、パイプライン内で仕様順へ並べ替える
+処理はないため、この文書をXDMF3の順へ戻してはならない。
 
 connectivityを持つmeshは `mesh_name`、XDMFの `topology_type`、
 `nodes_per_element` を指定することで一般化する。既定値は
