@@ -47,6 +47,9 @@ if [[ ! -f CMakeLists.txt && -f ../CMakeLists.txt ]]; then
 fi
 H5FORT_ROOT="$(pwd)"
 
+# Slurm opens the -o/-e files above before this script runs, so stdout/ and
+# stderr/ must already exist at submission time -- a .gitkeep in each keeps
+# them in the repository. This mkdir only covers someone deleting them later.
 mkdir -p stdout stderr
 
 ln -sf "./stdout/${SLURM_JOB_NAME}.${SLURM_JOB_ID}" ./out

@@ -18,8 +18,10 @@ fort.*
 
 res*.txt
 *.vtk
-stdout
-stderr
+stdout/*
+!stdout/.gitkeep
+stderr/*
+!stderr/.gitkeep
 log
 !/log/
 !/log/*.md

@@ -19,6 +19,9 @@
 set -euo pipefail
 
 cd "${SLURM_SUBMIT_DIR:?}"
+# Slurm opens the -o/-e files above before this script runs, so stdout/ and
+# stderr/ must already exist at submission time -- a .gitkeep in each keeps
+# them in the repository. This mkdir only covers someone deleting them later.
 mkdir -p stdout stderr
 
 . /usr/share/Modules/init/bash
