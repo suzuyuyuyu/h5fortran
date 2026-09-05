@@ -197,9 +197,7 @@ contains
     if (hdferr == 0) hdferr = err_local
   end subroutine get_data_rank_dims
 
-  !============================================================================
   ! h5fort_read_{kname}_0d — scalar (1D に委譲)
-  !============================================================================
 #:for kname, ftype, h5type in KINDS
   subroutine h5fort_read_${kname}$_0d(file_id, dset_path, scalar, hdferr, comm, transfer_mode)
     integer(hid_t), intent(in) :: file_id
@@ -221,9 +219,7 @@ contains
 
 #:endfor
 
-  !============================================================================
   ! h5fort_read_{kname}_1d — 1D allocatable
-  !============================================================================
 #:for kname, ftype, h5type in KINDS
   subroutine h5fort_read_${kname}$_1d(file_id, dset_path, array, hdferr, comm, transfer_mode)
     integer(hid_t), intent(in) :: file_id
@@ -249,9 +245,7 @@ contains
 
 #:endfor
 
-  !============================================================================
   ! h5fort_read_{kname}_{rank}d — 2D–4D allocatable
-  !============================================================================
 #:for kname, ftype, h5type in KINDS
   #:for rank in RANKS[1:]
   subroutine h5fort_read_${kname}$_${rank}$d(file_id, dset_path, array, hdferr, comm, transfer_mode)
@@ -288,9 +282,7 @@ contains
   #:endfor
 #:endfor
 
-  !============================================================================
   ! h5fort_read_str_0d — parallel では未実装
-  !============================================================================
   subroutine h5fort_read_str_0d(file_id, dset_path, str, hdferr)
     integer(hid_t), intent(in) :: file_id
     character(len=*), intent(in) :: dset_path
@@ -302,9 +294,7 @@ contains
     hdferr = -1
   end subroutine h5fort_read_str_0d
 
-  !============================================================================
   ! h5fort_read_lgc_{rank}d — logical (int32 から変換)
-  !============================================================================
   subroutine h5fort_read_lgc_0d(file_id, dset_path, scalar, hdferr, comm, transfer_mode)
     integer(hid_t), intent(in) :: file_id
     character(len=*), intent(in) :: dset_path

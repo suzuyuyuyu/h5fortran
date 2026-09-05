@@ -37,9 +37,6 @@ module h5fort_serial_read
 
 contains
 
-  !============================================================================
-  ! real64 / real32 / int32 / int64 — scalar (0D)
-  !============================================================================
   subroutine h5fort_read_r64_0d(file_id, dset_path, scalar, hdferr)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
@@ -121,9 +118,7 @@ contains
   end subroutine h5fort_read_i64_0d
 
 
-  !============================================================================
   ! real64 / real32 / int32 / int64 — arrays (1D–4D, allocatable)
-  !============================================================================
   subroutine h5fort_read_r64_1d(file_id, dset_path, array, hdferr)
     integer(hid_t),           intent(in)  :: file_id
     character(len=*),         intent(in)  :: dset_path
@@ -541,9 +536,7 @@ contains
   end subroutine h5fort_read_i64_4d
 
 
-  !============================================================================
   ! character scalar (可変長文字列)
-  !============================================================================
   subroutine h5fort_read_str_0d(file_id, dset_path, str, hdferr)
     integer(hid_t),                intent(in)  :: file_id
     character(len=*),              intent(in)  :: dset_path
@@ -581,9 +574,7 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_str_0d
 
-  !============================================================================
   ! logical scalar — int32 (0/1) として保存
-  !============================================================================
   subroutine h5fort_read_lgc_0d(file_id, dset_path, scalar, hdferr)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
@@ -606,9 +597,6 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_lgc_0d
 
-  !============================================================================
-  ! logical arrays (1D–4D)
-  !============================================================================
   subroutine h5fort_read_lgc_1d(file_id, dset_path, array, hdferr)
     integer(hid_t),       intent(in)  :: file_id
     character(len=*),     intent(in)  :: dset_path

@@ -235,9 +235,6 @@ contains
     end if
   end subroutine validate_data_partition
 
-  !============================================================================
-  ! 内部ヘルパー: write_{rank}d_{kname}
-  !============================================================================
 #:for rank in RANKS
   #:for kname, ftype, h5type in KINDS
   subroutine write_${rank}$d_${kname}$(group_id, dname, array, h5type, ${(', '.join(RANK_NX[rank]) + ', ') if RANK_NX[rank] else ''}$nlocal, off, ntotal, xfer_id, hdferr)
@@ -290,9 +287,7 @@ contains
   #:endfor
 #:endfor
 
-  !============================================================================
   ! h5fort_write_{kname}_0d — scalar (1D に委譲)
-  !============================================================================
 #:for kname, ftype, h5type in KINDS
   subroutine h5fort_write_${kname}$_0d(file_id, dset_path, scalar, hdferr, comm, transfer_mode)
     integer(hid_t), intent(in) :: file_id
@@ -307,9 +302,6 @@ contains
 
 #:endfor
 
-  !============================================================================
-  ! h5fort_write_{kname}_{rank}d — 1D–4D
-  !============================================================================
 #:for kname, ftype, h5type in KINDS
   #:for rank in RANKS
   subroutine h5fort_write_${kname}$_${rank}$d(file_id, dset_path, array, hdferr, comm, transfer_mode)
@@ -359,9 +351,7 @@ contains
   #:endfor
 #:endfor
 
-  !============================================================================
   ! h5fort_write_str_0d — parallel では未実装
-  !============================================================================
   subroutine h5fort_write_str_0d(file_id, dset_path, str, hdferr)
     integer(hid_t), intent(in) :: file_id
     character(len=*), intent(in) :: dset_path
@@ -372,9 +362,7 @@ contains
     hdferr = -1
   end subroutine h5fort_write_str_0d
 
-  !============================================================================
   ! h5fort_write_lgc_{rank}d — logical (int32 として保存)
-  !============================================================================
   subroutine h5fort_write_lgc_0d(file_id, dset_path, scalar, hdferr, comm, transfer_mode)
     integer(hid_t), intent(in) :: file_id
     character(len=*), intent(in) :: dset_path
@@ -403,8 +391,6 @@ contains
 
 #:endfor
 
-  !============================================================================
   ! Helper subroutines for selecting hyperslabs and creating memory spaces.
-  !============================================================================
   include "h5fort_parallel_read_slabs.inc"
 end module h5fort_parallel_write

@@ -22,9 +22,6 @@ module h5fort_serial_read
 
 contains
 
-  !============================================================================
-  ! real64 / real32 / int32 / int64 — scalar (0D)
-  !============================================================================
 #:for kname, ftype, h5type in KINDS
   subroutine h5fort_read_${kname}$_0d(file_id, dset_path, scalar, hdferr)
     integer(hid_t),   intent(in)  :: file_id
@@ -48,9 +45,7 @@ contains
 
 #:endfor
 
-  !============================================================================
   ! real64 / real32 / int32 / int64 — arrays (1D–4D, allocatable)
-  !============================================================================
 #:for kname, ftype, h5type in KINDS
   #:for rank in RANKS
   subroutine h5fort_read_${kname}$_${rank}$d(file_id, dset_path, array, hdferr)
@@ -82,9 +77,7 @@ contains
   #:endfor
 #:endfor
 
-  !============================================================================
   ! character scalar (可変長文字列)
-  !============================================================================
   subroutine h5fort_read_str_0d(file_id, dset_path, str, hdferr)
     integer(hid_t),                intent(in)  :: file_id
     character(len=*),              intent(in)  :: dset_path
@@ -122,9 +115,7 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_str_0d
 
-  !============================================================================
   ! logical scalar — int32 (0/1) として保存
-  !============================================================================
   subroutine h5fort_read_lgc_0d(file_id, dset_path, scalar, hdferr)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
@@ -147,9 +138,6 @@ contains
     call h5dclose_f(dset_id, err_local)
   end subroutine h5fort_read_lgc_0d
 
-  !============================================================================
-  ! logical arrays (1D–4D)
-  !============================================================================
 #:for rank in RANKS
   subroutine h5fort_read_lgc_${rank}$d(file_id, dset_path, array, hdferr)
     integer(hid_t),       intent(in)  :: file_id

@@ -50,9 +50,7 @@ contains
     if (first_error == 0 .and. latest_error /= 0) first_error = latest_error
   end subroutine record_error
 
-  !============================================================================
   ! 内部ユーティリティ: データセットの形状を取得する
-  !============================================================================
   subroutine get_dataset_info(file_id, dset_path, dset_id, rank, dims, hdferr)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
@@ -106,9 +104,7 @@ contains
     call record_error(hdferr, err_local)
   end subroutine get_dataset_info
 
-  !============================================================================
   ! 内部ユーティリティ: 中間グループ自動生成付きでデータセットを作成する
-  !============================================================================
   subroutine create_dataset(file_id, dset_path, h5type, rank, dims, dset_id, hdferr, mode)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
@@ -152,9 +148,7 @@ contains
     call record_error(hdferr, err_local)
   end subroutine create_dataset
 
-  !============================================================================
   ! 内部ユーティリティ: スカラーデータセットを作成する（H5S_SCALAR_F使用）
-  !============================================================================
   subroutine create_scalar_dataset(file_id, dset_path, h5type, dset_id, hdferr, mode)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
@@ -196,9 +190,6 @@ contains
     call record_error(hdferr, err_local)
   end subroutine create_scalar_dataset
 
-  !============================================================================
-  ! real64 / real32 / int32 / int64 — scalar (0D)
-  !============================================================================
   subroutine h5fort_write_r64_0d(file_id, dset_path, scalar, hdferr, mode, attrs, units)
     integer(hid_t),    intent(in)  :: file_id
     character(len=*),  intent(in)  :: dset_path
@@ -312,9 +303,6 @@ contains
   end subroutine h5fort_write_i64_0d
 
 
-  !============================================================================
-  ! real64 / real32 / int32 / int64 — arrays (1D–4D)
-  !============================================================================
   subroutine h5fort_write_r64_1d(file_id, dset_path, array, hdferr, mode, attrs, units)
     integer(hid_t),    intent(in)  :: file_id
     character(len=*),  intent(in)  :: dset_path
@@ -764,9 +752,7 @@ contains
   end subroutine h5fort_write_i64_4d
 
 
-  !============================================================================
   ! character scalar (可変長文字列)
-  !============================================================================
   subroutine h5fort_write_str_0d(file_id, dset_path, str, hdferr, mode, attrs, units)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
@@ -838,9 +824,7 @@ contains
     end if
   end subroutine h5fort_write_str_0d
 
-  !============================================================================
   ! logical scalar — int32 (0/1) として保存
-  !============================================================================
   subroutine h5fort_write_lgc_0d(file_id, dset_path, scalar, hdferr, mode, attrs, units)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path
@@ -871,9 +855,6 @@ contains
     end if
   end subroutine h5fort_write_lgc_0d
 
-  !============================================================================
-  ! logical arrays (1D–4D)
-  !============================================================================
   subroutine h5fort_write_lgc_1d(file_id, dset_path, array, hdferr, mode, attrs, units)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: dset_path

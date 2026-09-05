@@ -37,7 +37,6 @@
 #:for rank in RANKS
   #:set FIXED_PROCS = FIXED_PROCS + ['read_lgc_' + str(rank) + 'd_fixed']
 #:endfor
-!==============================================================================
 ! Module: h5fort_parallel_write
 !
 ! 概要:
@@ -59,7 +58,6 @@
 !
 ! 依存:
 !   HDF5 Fortran API (hdf5モジュール), iso_fortran_env
-!==============================================================================
 module h5fort_parallel
   use h5fort_parallel_write
   use h5fort_parallel_read
@@ -161,11 +159,9 @@ module h5fort_parallel
 
 contains
 
-  !============================================================================
   ! open: MPI-IO でファイルを開く
   !   mode=H5FORTRAN_FORCE_WRITE → 新規作成（既存ファイルは上書き）
   !   mode 省略                  → 既存ファイルを読み書きモードで開く
-  !============================================================================
   subroutine h5fort_parallel_open(self, mode)
     class(t_h5fort_parallel), intent(inout) :: self
     integer, intent(in), optional :: mode
@@ -204,9 +200,6 @@ contains
     if (self%hdferr == 0) self%hdferr = err_local
   end subroutine h5fort_parallel_open
 
-  !============================================================================
-  ! close: ファイルを閉じる
-  !============================================================================
   subroutine h5fort_parallel_close(self)
     class(t_h5fort_parallel), intent(inout) :: self
     self%hdferr = 0
@@ -218,9 +211,6 @@ contains
     end if
   end subroutine h5fort_parallel_close
 
-  !============================================================================
-  ! write PASS wrappers — real64 / real32 / int32 / int64 scalars and arrays
-  !============================================================================
 #:for kname, ftype, h5type in KINDS
   subroutine h5fort_parallel_write_${kname}$_0d(self, dset_path, scalar)
     class(t_h5fort_parallel), intent(inout) :: self
@@ -240,9 +230,6 @@ contains
   #:endfor
 #:endfor
 
-  !============================================================================
-  ! write PASS wrappers — character and logical
-  !============================================================================
   subroutine h5fort_parallel_write_str_0d(self, dset_path, str)
     class(t_h5fort_parallel), intent(inout) :: self
     character(len=*), intent(in) :: dset_path
@@ -267,9 +254,6 @@ contains
 
 #:endfor
 
-  !============================================================================
-  ! read PASS wrappers — real64 / real32 / int32 / int64 scalars and arrays
-  !============================================================================
 #:for kname, ftype, h5type in KINDS
   subroutine h5fort_parallel_read_${kname}$_0d(self, dset_path, scalar)
     class(t_h5fort_parallel), intent(inout) :: self
@@ -289,9 +273,6 @@ contains
   #:endfor
 #:endfor
 
-  !============================================================================
-  ! read PASS wrappers — character and logical
-  !============================================================================
   subroutine h5fort_parallel_read_str_0d(self, dset_path, str)
     class(t_h5fort_parallel), intent(inout) :: self
     character(len=*), intent(in)  :: dset_path
@@ -316,9 +297,6 @@ contains
 
 #:endfor
 
-  !============================================================================
-  ! read_fixed PASS wrappers — real64 / real32 / int32 / int64 (1D–4D)
-  !============================================================================
 #:for kname, ftype, h5type in KINDS
   #:for rank in RANKS
   subroutine h5fort_parallel_read_${kname}$_${rank}$d_fixed(self, dset_path, array)

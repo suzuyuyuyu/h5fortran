@@ -45,9 +45,7 @@ contains
     if (first_error == 0 .and. latest_error /= 0) first_error = latest_error
   end subroutine record_error
 
-  !============================================================================
   ! h5fort_swrite_attr: 複数の文字列 attribute をまとめて書き込む互換 API
-  !============================================================================
   subroutine h5fort_swrite_attr(file_id, obj_path, attrs, hdferr)
     integer(hid_t),    intent(in)  :: file_id
     character(len=*),  intent(in)  :: obj_path
@@ -64,9 +62,7 @@ contains
     end do
   end subroutine h5fort_swrite_attr
 
-  !============================================================================
   ! h5fort_write_attribute: データセット/グループに文字列 attribute を書く
-  !============================================================================
   subroutine h5fort_write_attribute_str(file_id, obj_path, name, value, hdferr)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: obj_path
@@ -144,9 +140,7 @@ contains
     call record_error(hdferr, err_local)
   end subroutine h5fort_write_attribute_str
 
-  !============================================================================
   ! h5fort_read_attribute: 文字列 attribute を可変長文字列へ読み込む
-  !============================================================================
   subroutine h5fort_read_attribute_str(file_id, obj_path, name, value, hdferr)
     integer(hid_t),                intent(in)  :: file_id
     character(len=*),              intent(in)  :: obj_path
@@ -199,9 +193,6 @@ contains
     call record_error(hdferr, err_local)
   end subroutine h5fort_read_attribute_str
 
-  !============================================================================
-  ! Numeric scalar attributes
-  !============================================================================
   subroutine h5fort_write_attribute_r64_0d(file_id, obj_path, name, value, hdferr)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: obj_path
@@ -539,9 +530,6 @@ contains
   end subroutine h5fort_read_attribute_i64_0d
 
 
-  !============================================================================
-  ! Numeric rank-1 attributes
-  !============================================================================
   subroutine h5fort_write_attribute_r64_1d(file_id, obj_path, name, values, hdferr)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: obj_path
@@ -911,9 +899,7 @@ contains
   end subroutine h5fort_read_attribute_i64_1d
 
 
-  !============================================================================
   ! h5fort_get_attribute_info: attribute の要素数を返す
-  !============================================================================
   subroutine h5fort_get_attribute_info(file_id, obj_path, name, count, hdferr)
     integer(hid_t),   intent(in)  :: file_id
     character(len=*), intent(in)  :: obj_path

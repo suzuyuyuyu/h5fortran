@@ -1,7 +1,6 @@
 ! DO NOT EDIT — generated from src/fypp/parallel/h5fort_parallel.fypp
 ! To regenerate: src/fypp/generate_fypp.sh
 
-!==============================================================================
 ! Module: h5fort_parallel_write
 !
 ! 概要:
@@ -23,7 +22,6 @@
 !
 ! 依存:
 !   HDF5 Fortran API (hdf5モジュール), iso_fortran_env
-!==============================================================================
 module h5fort_parallel
   use h5fort_parallel_write
   use h5fort_parallel_read
@@ -239,11 +237,9 @@ module h5fort_parallel
 
 contains
 
-  !============================================================================
   ! open: MPI-IO でファイルを開く
   !   mode=H5FORTRAN_FORCE_WRITE → 新規作成（既存ファイルは上書き）
   !   mode 省略                  → 既存ファイルを読み書きモードで開く
-  !============================================================================
   subroutine h5fort_parallel_open(self, mode)
     class(t_h5fort_parallel), intent(inout) :: self
     integer, intent(in), optional :: mode
@@ -282,9 +278,6 @@ contains
     if (self%hdferr == 0) self%hdferr = err_local
   end subroutine h5fort_parallel_open
 
-  !============================================================================
-  ! close: ファイルを閉じる
-  !============================================================================
   subroutine h5fort_parallel_close(self)
     class(t_h5fort_parallel), intent(inout) :: self
     self%hdferr = 0
@@ -296,9 +289,6 @@ contains
     end if
   end subroutine h5fort_parallel_close
 
-  !============================================================================
-  ! write PASS wrappers — real64 / real32 / int32 / int64 scalars and arrays
-  !============================================================================
   subroutine h5fort_parallel_write_r64_0d(self, dset_path, scalar)
     class(t_h5fort_parallel), intent(inout) :: self
     character(len=*), intent(in) :: dset_path
@@ -440,9 +430,6 @@ contains
   end subroutine h5fort_parallel_write_i64_4d
 
 
-  !============================================================================
-  ! write PASS wrappers — character and logical
-  !============================================================================
   subroutine h5fort_parallel_write_str_0d(self, dset_path, str)
     class(t_h5fort_parallel), intent(inout) :: self
     character(len=*), intent(in) :: dset_path
@@ -486,9 +473,6 @@ contains
   end subroutine h5fort_parallel_write_lgc_4d
 
 
-  !============================================================================
-  ! read PASS wrappers — real64 / real32 / int32 / int64 scalars and arrays
-  !============================================================================
   subroutine h5fort_parallel_read_r64_0d(self, dset_path, scalar)
     class(t_h5fort_parallel), intent(inout) :: self
     character(len=*), intent(in)  :: dset_path
@@ -630,9 +614,6 @@ contains
   end subroutine h5fort_parallel_read_i64_4d
 
 
-  !============================================================================
-  ! read PASS wrappers — character and logical
-  !============================================================================
   subroutine h5fort_parallel_read_str_0d(self, dset_path, str)
     class(t_h5fort_parallel), intent(inout) :: self
     character(len=*), intent(in)  :: dset_path
@@ -676,9 +657,6 @@ contains
   end subroutine h5fort_parallel_read_lgc_4d
 
 
-  !============================================================================
-  ! read_fixed PASS wrappers — real64 / real32 / int32 / int64 (1D–4D)
-  !============================================================================
   subroutine h5fort_parallel_read_r64_1d_fixed(self, dset_path, array)
     class(t_h5fort_parallel), intent(inout) :: self
     character(len=*), intent(in)  :: dset_path

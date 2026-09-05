@@ -37,7 +37,6 @@
 #:for rank in RANKS
   #:set FIXED_PROCS = FIXED_PROCS + ['read_lgc_' + str(rank) + 'd_fixed']
 #:endfor
-!==============================================================================
 ! Module: h5fort_serial
 !
 ! 概要:
@@ -58,7 +57,6 @@
 !
 ! 依存:
 !   HDF5 Fortran API (hdf5モジュール), iso_fortran_env
-!==============================================================================
 module h5fort_serial
   use h5fort_serial_attribute
   use h5fort_serial_write
@@ -158,9 +156,6 @@ module h5fort_serial
 
 contains
 
-  !============================================================================
-  ! attribute PASS wrappers — character scalar
-  !============================================================================
   subroutine h5fort_serial_write_attribute(self, obj_path, name, value)
     class(t_h5fort_serial), intent(inout) :: self
     character(len=*), intent(in) :: obj_path
@@ -177,11 +172,9 @@ contains
     call h5fort_read_attribute(self%file_id, obj_path, name, value, self%hdferr)
   end subroutine h5fort_serial_read_attribute
 
-  !============================================================================
   ! open: ファイルを開く
   !   mode=H5FORTRAN_FORCE_WRITE → 新規作成（既存ファイルは上書き）
   !   mode 省略                  → 既存ファイルを読み書きモードで開く
-  !============================================================================
   subroutine h5fort_serial_open(self, mode)
     class(t_h5fort_serial), intent(inout) :: self
     integer, intent(in), optional :: mode
@@ -206,9 +199,6 @@ contains
     end if
   end subroutine h5fort_serial_open
 
-  !============================================================================
-  ! close: ファイルを閉じる
-  !============================================================================
   subroutine h5fort_serial_close(self)
     class(t_h5fort_serial), intent(inout) :: self
     self%hdferr = 0
@@ -220,9 +210,6 @@ contains
     end if
   end subroutine h5fort_serial_close
 
-  !============================================================================
-  ! write PASS wrappers — real64 / real32 / int32 / int64 scalars and arrays
-  !============================================================================
 #:for kname, ftype, h5type in KINDS
   subroutine h5fort_serial_write_${kname}$_0d(self, dset_path, scalar, mode, attrs, units)
     class(t_h5fort_serial), intent(inout) :: self
@@ -248,9 +235,6 @@ contains
   #:endfor
 #:endfor
 
-  !============================================================================
-  ! write PASS wrappers — character and logical
-  !============================================================================
   subroutine h5fort_serial_write_str_0d(self, dset_path, str, mode, attrs, units)
     class(t_h5fort_serial), intent(inout) :: self
     character(len=*),  intent(in) :: dset_path
@@ -284,9 +268,6 @@ contains
 
 #:endfor
 
-  !============================================================================
-  ! read PASS wrappers — real64 / real32 / int32 / int64 scalars and arrays
-  !============================================================================
 #:for kname, ftype, h5type in KINDS
   subroutine h5fort_serial_read_${kname}$_0d(self, dset_path, scalar)
     class(t_h5fort_serial), intent(inout) :: self
@@ -306,9 +287,6 @@ contains
   #:endfor
 #:endfor
 
-  !============================================================================
-  ! read PASS wrappers — character and logical
-  !============================================================================
   subroutine h5fort_serial_read_str_0d(self, dset_path, str)
     class(t_h5fort_serial), intent(inout) :: self
     character(len=*),              intent(in)  :: dset_path
@@ -333,9 +311,6 @@ contains
 
 #:endfor
 
-  !============================================================================
-  ! read_fixed PASS wrappers — real64 / real32 / int32 / int64 (1D–4D)
-  !============================================================================
 #:for kname, ftype, h5type in KINDS
   #:for rank in RANKS
   subroutine h5fort_serial_read_${kname}$_${rank}$d_fixed(self, dset_path, array)

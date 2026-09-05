@@ -198,9 +198,7 @@ contains
     if (hdferr == 0) hdferr = err_local
   end subroutine get_data_rank_dims
 
-  !============================================================================
   ! h5fort_read_{kname}_0d — scalar (1D に委譲)
-  !============================================================================
   subroutine h5fort_read_r64_0d(file_id, dset_path, scalar, hdferr, comm, transfer_mode)
     integer(hid_t), intent(in) :: file_id
     character(len=*), intent(in) :: dset_path
@@ -274,9 +272,7 @@ contains
   end subroutine h5fort_read_i64_0d
 
 
-  !============================================================================
   ! h5fort_read_{kname}_1d — 1D allocatable
-  !============================================================================
   subroutine h5fort_read_r64_1d(file_id, dset_path, array, hdferr, comm, transfer_mode)
     integer(hid_t), intent(in) :: file_id
     character(len=*), intent(in) :: dset_path
@@ -370,9 +366,7 @@ contains
   end subroutine h5fort_read_i64_1d
 
 
-  !============================================================================
   ! h5fort_read_{kname}_{rank}d — 2D–4D allocatable
-  !============================================================================
   subroutine h5fort_read_r64_2d(file_id, dset_path, array, hdferr, comm, transfer_mode)
     integer(hid_t), intent(in) :: file_id
     character(len=*), intent(in) :: dset_path
@@ -686,9 +680,7 @@ contains
   end subroutine h5fort_read_i64_4d
 
 
-  !============================================================================
   ! h5fort_read_str_0d — parallel では未実装
-  !============================================================================
   subroutine h5fort_read_str_0d(file_id, dset_path, str, hdferr)
     integer(hid_t), intent(in) :: file_id
     character(len=*), intent(in) :: dset_path
@@ -700,9 +692,7 @@ contains
     hdferr = -1
   end subroutine h5fort_read_str_0d
 
-  !============================================================================
   ! h5fort_read_lgc_{rank}d — logical (int32 から変換)
-  !============================================================================
   subroutine h5fort_read_lgc_0d(file_id, dset_path, scalar, hdferr, comm, transfer_mode)
     integer(hid_t), intent(in) :: file_id
     character(len=*), intent(in) :: dset_path
