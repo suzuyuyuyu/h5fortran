@@ -20,12 +20,11 @@ ctest --test-dir build --output-on-failure
 cmake --install build --prefix "$HOME/.local"
 ```
 
-Serial / Parallel は個別に選択できます（既定は両方 `ON`）。
+Serial API は常に利用できます。Parallel API は `H5FORTRAN_ENABLE_PARALLEL=ON` で有効になります（既定は `OFF`）。
 
 ```sh
 # Serial のみ。MPI と Parallel HDF5 は不要
 cmake -S . -B build-serial \
-  -DH5FORTRAN_ENABLE_SERIAL=ON \
   -DH5FORTRAN_ENABLE_PARALLEL=OFF
 ```
 

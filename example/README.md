@@ -8,7 +8,8 @@
 | `serial-oop/` | Serial OOP API | `example_serial_oop` |
 | `parallel/` | Parallel手続きAPI | `example_parallel` |
 | `parallel-oop/` | Parallel OOP API | `example_parallel_oop` |
-| `visualization/` | 可視化HDF5とXDMF生成 | `example_visualization` |
+| [`serial-viz/`](serial-viz/README.md) | 逐次可視化HDF5とXDMF生成（`t_hdf5_writer`） | `example_serial_viz` |
+| [`parallel-viz/`](parallel-viz/README.md) | 並列可視化HDF5とXDMF生成（`t_phdf5_writer`） | `example_parallel_viz` |
 
 リポジトリ全体から、すべてをまとめてコンパイルする。
 
@@ -37,15 +38,20 @@ build/example/example_serial_oop
 
 standalone configureでは `example/_build/example/` 以下に生成される。
 
-Parallel例:
+Parallel例（クラスタではジョブスクリプト内で実行。ログインノードでは実行しない）:
 
 ```sh
 mpiexec -n 2 build/example/example_parallel
 mpiexec -n 2 build/example/example_parallel_oop
 ```
 
-可視化例は次のコマンドでMPI出力からPython後処理まで実行する。
+逐次可視化例は次のコマンドで1プロセスのHDF5出力から後処理まで実行する。
 
 ```sh
-example/visualization/generate.sh build
+example/serial-viz/generate.sh build
 ```
+
+並列可視化例は `example/parallel-viz/generate.sh build` をジョブスクリプトから
+実行する。両例とも四面体meshと粒子群を同じfield名で5時刻分出力する。
+Serial例は常にビルドされ、Parallel例は
+`H5FORTRAN_ENABLE_PARALLEL=ON` のときにビルドされる。

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Serial APIを常時ビルド・公開するようにし、逐次APIの有効化オプションと条件付きマクロを削除した。
+- 可視化writerをserial型とそれを継承するparallel型に分離し、同一ビルドでの併用と共通レイアウトを検証するテストを追加した。
 - `Tensor6`の成分順序を訂正した。`SPEC.md`がXDMF3の`XX, XY, XZ, YY, YZ, ZZ`を記載していたが、h5xdmfは並べ替えず保存列をそのまま参照するため、ParaView/VTKが期待する`XX, YY, ZZ, XY, YZ, XZ`をh5fortranの文書に採用した。
 - Serial公開属性genericへ4種の数値型のscalar・1D配列読み書きと要素数取得を追加した。
 - `h5xdmf`を独立リポジトリへ分離し、製品SemVerとHDF5 scheme versionを独立させた。

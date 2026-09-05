@@ -1,7 +1,9 @@
-# 可視化用Parallel HDF5出力
+# 可視化用HDF5出力
 
-`t_phdf5_writer` は全MPI rankのmeshとfieldを一つのHDF5ファイルへ集合的に
-書きます。Fortran側ではXDMF/XMLを生成しません。HDF5時系列を出力した後、
+`t_hdf5_writer` はローカルのmeshとfieldを逐次出力します。
+`t_phdf5_writer` は全MPI rankのデータを一つのHDF5ファイルへ集合的に書きます。
+Parallel APIを有効にしたビルドでは、用途に応じて二つのwriterを使い分けられます。
+どちらも同じscheme_version=1のレイアウトを生成します。Fortran側ではXDMF/XMLを生成しません。HDF5時系列を出力した後、
 独立ツール[`h5xdmf`](https://github.com/suzuyuyuyu/h5xdmf)でXDMF3を生成します。
 
 snapshot HDF5を正本とし、`metadata.h5` はPythonが作る再生成可能な索引とする。
@@ -55,6 +57,27 @@ if (hdferr /= 0) call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
 call MPI_Finalize(ierr)
 ```
 
+逐次出力には型を `type(t_hdf5_writer)` に変更し、`use mpi` とMPIの初期化・終了を
+省略します。HDF5のエラー判定は `if (hdferr /= 0) error stop` とします。
+writerの設定とwrite呼び出しは共通です。逐次writerはMPI有効ビルドでも利用できます。
+複数rankから逐次出力する場合、rankごとに異なるファイル名を指定してください。
+
+`h5fort` は常に `t_hdf5_writer` を公開し、
+`H5FORTRAN_ENABLE_PARALLEL=ON` で `t_phdf5_writer` を公開します。
+逐次writerだけを使うconsumerでは `h5fortran_serial` のみをリンクし、
+`use h5fort_serial_visualization, only: t_hdf5_writer` とします。
+インストール後のtarget名は `h5fortran::h5fortran_serial` です。
+並列consumerは `h5fortran_parallel`、全APIを使う場合は `h5fortran` をリンクします。
+
+`H5FORTRAN_HDF5_ROOT`（または `HDF5_ROOT`）に使用するHDF5のprefixを指定します。
+一つのビルドでは全targetが同じHDF5を使います。parallel構成にはparallel HDF5が必要です。
+この構成では `h5fortran_serial` だけをリンクしても、parallel HDF5由来のMPI依存が残ります。
+MPI依存のない構成には、`H5FORTRAN_ENABLE_PARALLEL=OFF` とserial HDF5を指定して
+別途ビルドしてください。serial構成でparallel HDF5を使用することもできますが、
+その場合もHDF5由来のMPI依存は残ります。
+
+以下のrankに関する説明はparallel writerに適用します。
+
 `num_cells` は各rankが出力するowned cell数で、ghost cellは含めません。
 `num_points` はowned cellが参照する全local node数です。rank境界の共有・halo nodeは
 rankごとに別nodeとして重複して構いません。
@@ -64,7 +87,7 @@ writerがrankごとのnode offsetを加え、HDF5全体のIDへ変換します�
 global node IDを計算するための通信は不要です。`init`、write、`close` は全rankが
 同じ順序で呼びます。
 
-writerはHDF5ライブラリ自体の開始・終了を行いません。全rankがプログラム全体で
+両writerともHDF5ライブラリ自体の開始・終了を行いません。parallelでは全rankがプログラム全体で
 `MPI_Init` → `h5open_f` → writer処理 → `h5close_f` → `MPI_Finalize` の順に
 呼びます。複数stepや複数meshを書いても、`h5open_f` / `h5close_f` はそれぞれ
 1回だけです。
@@ -167,15 +190,24 @@ field本体はXDMFへ複製されず、各 `seqNNNNNN.h5` のdatasetを参照す
 
 ## 完成形のexample
 
-2 MPI rank、5 stepの流体・土粒子snapshot出力からポストプロセスまでを一括実行
-できます。流体は四面体mesh上の圧力波と渦速度、土粒子は沈降・拡散と応力を持つ。
+逐次・並列のどちらも、5 stepの流体・土粒子snapshot出力からポストプロセスまで
+一括実行できます。流体は四面体mesh上の圧力波と渦速度、土粒子は沈降・拡散と応力を持つ。
+
+| example | writer | 実行ファイル | データ規模 |
+|---|---|---|---|
+| [`serial-viz`](../example/serial-viz/README.md) | `t_hdf5_writer` | `example_serial_viz` | 1プロセスで全meshを作成 |
+| [`parallel-viz`](../example/parallel-viz/README.md) | `t_phdf5_writer` | `example_parallel_viz` | 既定2 rankのlocal meshを結合 |
+
+1プロセスで出力する場合は逐次例を使います。
 
 ```sh
-example/visualization/generate.sh build
+example/serial-viz/generate.sh build
 ```
 
-生成されるファイルと使い方は
-[`example/visualization/README.md`](../example/visualization/README.md) を参照してください。
+複数rankから集合的に出力する場合は `example/parallel-viz/generate.sh build` を
+使います。クラスタではジョブスクリプトから実行し、ログインノードでは実行しません。
+両例は同じmesh・field名で `result/seq000000.h5` 〜 `seq000004.h5` を生成します。
+生成されるファイルと使い方は各exampleのREADMEを参照してください。
 ParaViewでの色付け、Glyph、粒子表示の手順もexample READMEに記載している。
 
 必要な実行時ツールはPython 3.10以上、`h5py`、`numpy`です。依存関係と固定版は

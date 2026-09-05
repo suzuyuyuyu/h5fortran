@@ -40,6 +40,7 @@ if [ "${check}" = true ]; then
   trap 'rm -rf "${tmp_dir}"' EXIT HUP INT TERM
 fi
 
+generate serial/h5fort_serial_visualization.fypp serial/h5fort_serial_visualization.F90
 generate serial/h5fort_serial.fypp serial/h5fort_serial.F90
 generate serial/h5fort_serial_attribute.fypp serial/h5fort_serial_attribute.F90
 generate serial/h5fort_serial_read.fypp serial/h5fort_serial_read.F90

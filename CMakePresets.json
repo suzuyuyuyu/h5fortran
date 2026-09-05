@@ -17,7 +17,6 @@
       "hidden": true,
       "inherits": "base",
       "cacheVariables": {
-        "H5FORTRAN_ENABLE_SERIAL": "ON",
         "H5FORTRAN_ENABLE_PARALLEL": "OFF"
       }
     },
@@ -26,7 +25,6 @@
       "hidden": true,
       "inherits": "base",
       "cacheVariables": {
-        "H5FORTRAN_ENABLE_SERIAL": "ON",
         "H5FORTRAN_ENABLE_PARALLEL": "ON"
       }
     },

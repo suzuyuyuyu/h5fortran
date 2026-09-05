@@ -1,7 +1,6 @@
-program write_visualization_results
+program write_serial_viz_results
   use hdf5, only: h5open_f, h5close_f
   use h5fort
-  use mpi
   use, intrinsic :: iso_fortran_env, only: int32, int64, real64
   implicit none
 
@@ -13,8 +12,8 @@ program write_visualization_results
   integer, parameter :: max_soil_particles = soil_nx * soil_ny * soil_nz
   real(real64), parameter :: pi = acos(-1.0_real64)
 
-  type(t_phdf5_writer) :: fluid, soil
-  integer :: ierr, hdferr, me, nprocs, step, i, ix, iy, iz, cell, num_soil_particles
+  type(t_hdf5_writer) :: fluid, soil
+  integer :: hdferr, step, i, ix, iy, iz, cell, num_soil_particles
   integer :: vertices(8), tetrahedra(4, 6)
   character(len=256) :: filename
   real(real64) :: time, x, y, z, x0, y0, z0, xc, yc, radius, phase
@@ -26,33 +25,28 @@ program write_visualization_results
   real(real64), allocatable :: particle_stress(:)
   integer(int64), allocatable :: particle_id(:)
 
-  call MPI_Init(ierr)
   call h5open_f(hdferr)
-  if (hdferr /= 0) call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
-  call MPI_Comm_rank(MPI_COMM_WORLD, me, ierr)
-  call MPI_Comm_size(MPI_COMM_WORLD, nprocs, ierr)
+  if (hdferr /= 0) error stop "HDF5 initialization or finalization failed"
 
-  if (me == 0) call execute_command_line("mkdir -p result")
-  call MPI_Barrier(MPI_COMM_WORLD, ierr)
+  call execute_command_line("mkdir -p result")
 
-  call make_fluid_mesh(me, fluid_nodes, fluid_connectivity)
-  subdomain_id = int(me, int32)
-  xc = 0.5_real64 * real(fluid_nx * nprocs, real64)
+  call make_fluid_mesh(fluid_nodes, fluid_connectivity)
+  subdomain_id = 0_int32
+  xc = 0.5_real64 * real(fluid_nx, real64)
   yc = 0.5_real64 * real(fluid_ny, real64)
 
   do step = 0, num_steps - 1
     write(filename, '("result/seq",i6.6,".h5")') step
     time = 0.25_real64 * real(step, real64)
 
-    if (me == 0) call delete_if_exists(trim(filename))
-    call MPI_Barrier(MPI_COMM_WORLD, ierr)
+    call delete_if_exists(trim(filename))
 
     ! A travelling pressure wave combined with a time-modulated vortex.
     do i = 1, fluid_points
       x = fluid_nodes(1, i)
       y = fluid_nodes(2, i)
       z = fluid_nodes(3, i)
-      phase = 2.0_real64 * pi * (x / real(fluid_nx * nprocs, real64) - 0.35_real64 * time)
+      phase = 2.0_real64 * pi * (x / real(fluid_nx, real64) - 0.35_real64 * time)
       pressure(i) = 1000.0_real64 * (real(fluid_nz, real64) - z) + &
         180.0_real64 * sin(phase) * cos(pi * y / real(fluid_ny, real64))
       velocity(1, i) = -0.18_real64 * (y - yc) * cos(2.0_real64 * pi * 0.2_real64 * time)
@@ -79,7 +73,7 @@ program write_visualization_results
 
     ! A granular layer settles and spreads radially.  A few particles leave the
     ! domain at each step, demonstrating variable entity counts.
-    num_soil_particles = max(1, max_soil_particles - 2 * step - me)
+    num_soil_particles = max(1, max_soil_particles - 2 * step)
     allocate(particle_nodes(3, num_soil_particles))
     allocate(particle_velocity(3, num_soil_particles))
     allocate(particle_stress(num_soil_particles))
@@ -88,7 +82,7 @@ program write_visualization_results
       ix = modulo(i - 1, soil_nx)
       iy = modulo((i - 1) / soil_nx, soil_ny)
       iz = (i - 1) / (soil_nx * soil_ny)
-      x0 = real(me * soil_nx + ix, real64) + 0.5_real64
+      x0 = real(ix, real64) + 0.5_real64
       y0 = real(iy, real64) + 0.5_real64
       z0 = 2.15_real64 + 0.32_real64 * real(iz, real64)
       radius = sqrt((x0 - xc)**2 + (y0 - yc)**2)
@@ -101,7 +95,7 @@ program write_visualization_results
       particle_nodes(3, i) = max(0.15_real64, z0 + time * particle_velocity(3, i))
       particle_stress(i) = 5.0_real64 + &
         14.0_real64 * (real(fluid_nz, real64) - particle_nodes(3, i))
-      particle_id(i) = int(max_soil_particles * me + i, int64)
+      particle_id(i) = int(i, int64)
     end do
 
     soil%h5_filepath = trim(filename)
@@ -121,13 +115,11 @@ program write_visualization_results
   end do
 
   call h5close_f(hdferr)
-  if (hdferr /= 0) call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
-  call MPI_Finalize(ierr)
+  if (hdferr /= 0) error stop "HDF5 initialization or finalization failed"
 
 contains
 
-  subroutine make_fluid_mesh(rank, nodes, connectivity)
-    integer, intent(in) :: rank
+  subroutine make_fluid_mesh(nodes, connectivity)
     real(real64), intent(out) :: nodes(3, fluid_points)
     integer(int64), intent(out) :: connectivity(4, fluid_cells)
     integer :: local_node, t
@@ -136,7 +128,7 @@ contains
       do iy = 0, fluid_ny
         do ix = 0, fluid_nx
           local_node = node_index(ix, iy, iz)
-          nodes(:, local_node) = [real(rank * fluid_nx + ix, real64), &
+          nodes(:, local_node) = [real(ix, real64), &
             real(iy, real64), real(iz, real64)]
         end do
       end do
@@ -186,4 +178,4 @@ contains
     if (ios == 0) close(unit, status="delete")
   end subroutine delete_if_exists
 
-end program write_visualization_results
+end program write_serial_viz_results

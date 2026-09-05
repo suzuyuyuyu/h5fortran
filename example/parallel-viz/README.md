@@ -1,4 +1,8 @@
-# Visualization output example
+# Parallel visualization output example
+
+1プロセスの出力には [`t_hdf5_writer` の逐次例](../serial-viz/README.md)、
+複数MPI rankのデータを一つのファイルへ集合的に出力する場合には、この例の
+`t_phdf5_writer` を使う。両者のmesh・field名とファイルレイアウトは共通である。
 
 2 MPI rank、5 output stepの小さな流体・土粒子計算を模擬し、Fortranによる
 snapshot HDF5出力からPythonによるmanifest・XDMF生成までを実行する。
@@ -54,32 +58,35 @@ uv tool install ../h5xdmf
 ```sh
 cmake -S . -B build \
   -DCMAKE_Fortran_COMPILER=mpiifx \
-  -DHDF5_ROOT=/path/to/parallel-hdf5
+  -DHDF5_ROOT=/path/to/parallel-hdf5 \
+  -DH5FORTRAN_ENABLE_PARALLEL=ON \
+  -DH5FORTRAN_BUILD_EXAMPLES=ON
 ```
 
-リポジトリrootから次を実行する。
+クラスタでは、以下の実行コマンドをジョブスクリプト内に記述して投入する。
+ログインノードでは実行しない。作業ディレクトリはリポジトリrootとする。
 
 ```sh
-example/visualization/generate.sh build
+example/parallel-viz/generate.sh build
 ```
 
 build directoryを省略すると、リポジトリrootの `build/` を使用する。
 
 ```sh
-example/visualization/generate.sh
+example/parallel-viz/generate.sh
 ```
 
 MPI launcherとrank数は環境変数で変更できる。
 
 ```sh
-MPIEXEC=mpiexec NPROCS=4 example/visualization/generate.sh build
+MPIEXEC=mpiexec NPROCS=4 example/parallel-viz/generate.sh build
 ```
 
 生成後はParaViewで次を個別に開く。
 
 ```text
-example/visualization/result/fluid.xdmf
-example/visualization/result/soil_particles.xdmf
+example/parallel-viz/result/fluid.xdmf
+example/parallel-viz/result/soil_particles.xdmf
 ```
 
 両方を同時に読み込めば、流体meshと土粒子を重ねて表示できる。
@@ -103,8 +110,8 @@ node offsetを加えている。
 ## ポストプロセスだけ再実行
 
 ```sh
-h5xdmf "example/visualization/result/seq*.h5" \
-  --metadata example/visualization/result/metadata.h5 \
-  --outdir example/visualization/result \
+h5xdmf "example/parallel-viz/result/seq*.h5" \
+  --metadata example/parallel-viz/result/metadata.h5 \
+  --outdir example/parallel-viz/result \
   --rebuild
 ```

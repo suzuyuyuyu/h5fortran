@@ -12,11 +12,11 @@ case "${build_dir}" in
   *) build_dir="${repo_dir}/${build_dir}" ;;
 esac
 
-cmake --build "${build_dir}" --target example_visualization
+cmake --build "${build_dir}" --target example_parallel_viz
 
 (
   cd "${example_dir}"
-  "${mpiexec_bin}" -n "${num_ranks}" "${build_dir}/example/example_visualization"
+  "${mpiexec_bin}" -n "${num_ranks}" "${build_dir}/example/example_parallel_viz"
 )
 
 (

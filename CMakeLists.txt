@@ -3,7 +3,7 @@ project(
     h5fortran
     VERSION 1.1.0
     DESCRIPTION "Fortran interface to HDF5"
-    LANGUAGES Fortran
+    LANGUAGES C Fortran
 )
 
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/generated")
@@ -16,18 +16,18 @@ include(CTest)
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
-option(H5FORTRAN_ENABLE_SERIAL "Build the serial API" ON)
 option(H5FORTRAN_ENABLE_PARALLEL "Build the parallel MPI API" OFF)
 option(H5FORTRAN_BUILD_EXAMPLES "Build the example programs" ON)
 option(H5FORTRAN_BUILD_TESTS "Build the test programs" ${BUILD_TESTING})
 
-if(NOT H5FORTRAN_ENABLE_SERIAL AND NOT H5FORTRAN_ENABLE_PARALLEL)
-  message(FATAL_ERROR "At least one of H5FORTRAN_ENABLE_SERIAL or H5FORTRAN_ENABLE_PARALLEL must be ON")
-endif()
-
 set(CMAKE_Fortran_MODULE_DIRECTORY "${CMAKE_BINARY_DIR}/mod")
 file(MAKE_DIRECTORY "${CMAKE_Fortran_MODULE_DIRECTORY}")
 
+set(H5FORTRAN_HDF5_ROOT "" CACHE PATH "HDF5 installation prefix")
+if(H5FORTRAN_HDF5_ROOT)
+  set(HDF5_ROOT "${H5FORTRAN_HDF5_ROOT}")
+  unset(HDF5_DIR CACHE)
+endif()
 if(H5FORTRAN_ENABLE_PARALLEL)
   set(HDF5_PREFER_PARALLEL ON)
 endif()

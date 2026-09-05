@@ -104,7 +104,18 @@ write時とread時の両方で、`data` の最終次元長が `__partition__` �
 
 ## Visualization HDF5 writer
 
-`t_phdf5_writer` はXDMF/XMLを生成せず、`scheme_version=1` のHDF5を出力する。
+`t_hdf5_writer` はローカルデータを逐次出力し、`t_phdf5_writer` は全rankのデータを
+集合的に出力する。Parallel APIを有効にしたビルドでは二つの型を同時に利用できる。
+どちらもXDMF/XMLを生成せず、同じ `scheme_version=1` のHDF5を出力する。
+
+共通の型・kind展開・dataset・mesh・属性処理は
+`src/fypp/serial/h5fort_serial_visualization.fypp` に集約する。
+parallel型はserial型を継承し、rankごとのoffsetとtotal、ファイルアクセスと
+転送property listだけを設定して共通の `initialize` を呼ぶ。
+serial側はparallel側に依存しない。一つのビルドでは全targetが同じHDF5を使う。
+parallel HDF5を使う構成では、`h5fortran_serial` 単独のリンクにもHDF5由来のMPI依存がある。
+serialライブラリは常にビルドされ、serial APIと `t_hdf5_writer` は常に公開される。
+parallel APIと `t_phdf5_writer` は `H5FORTRAN_ENABLE_PARALLEL=ON` の場合に公開される（既定は `OFF`）。
 root属性は `scheme_version` と `time`、mesh group属性は `topology_type` と
 `nodes_per_element`、vector/tensor dataset属性は `attribute_type` とする。
 geometry は real32/real64/real128、connectivity は int8/int16/int32/int64、
