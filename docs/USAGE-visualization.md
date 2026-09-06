@@ -145,19 +145,24 @@ call writer%close()
 
 ## scheme_version=1
 
-```text
-/                                      attrs: scheme_version=1, time=<float64>
-/<mesh>/                               attrs: topology_type, nodes_per_element
-/<mesh>/geometry/nodes                 (num_nodes, 3)
-/<mesh>/geometry/connectivity          (num_elements, npe), PolyDataでは省略
-/<mesh>/point_data/<field>             (num_nodes[, ncomp])
-/<mesh>/cell_data/<field>              (num_elements[, ncomp])
-```
+保存先と属性は共有仕様の[可視化レイアウト](https://github.com/suzuyuyuyu/h5c/blob/main/docs/FORMAT.md#可視化レイアウト)を参照してください。
 
-2D fieldには `attribute_type=Vector|Tensor6|Tensor` 属性も書かれます。対応成分数は
-3、6、9です。1D fieldは `Scalar` です。
-`Tensor6` の成分順序は `XX, YY, ZZ, XY, YZ, XZ` です。理由とXDMF3仕様との差異は
-[SPEC.md](SPEC.md) を参照してください。
+Fortran配列はcolumn-majorで、第1次元が最も速く変化します。HDF5 Fortran APIは
+次元を反転して保存するため、C/C++・h5pyのrow-major表記とは次の対応になります。
+
+| Fortranで渡す形状 | ファイル上の形状 |
+|---|---|
+| `nodes(3, num_points)` | `(num_points, 3)` |
+| `connectivity(nodes_per_element, num_cells)` | `(num_cells, nodes_per_element)` |
+| `field(ncomp, nlocal)` | `(nlocal, ncomp)` |
+| `field(nlocal)` | `(nlocal)` |
+
+並列出力ではFortranの最終次元（ファイル上の第0次元）に沿ってrankのデータを連結します。
+呼び出し側で転置する必要はありません。一般の配列も `a(nx, ny)` がファイルでは
+`(ny, nx)` になります。[次元順序](https://github.com/suzuyuyuyu/h5c/blob/main/docs/FORMAT.md#次元順序)も参照してください。
+
+`Tensor6` は `field(6, nlocal)` の第1次元を `XX, YY, ZZ, XY, YZ, XZ` の順にします。
+[テンソル成分の順序](https://github.com/suzuyuyuyu/h5c/blob/main/docs/FORMAT.md#多成分フィールド)に従ってください。
 
 geometryは `real(real32/real64/real128)`、connectivityは
 `integer(int8/int16/int32/int64)`、point/cell dataはこれら7 kindの1D/2Dに
@@ -172,20 +177,7 @@ uv tool install ../h5xdmf
 h5xdmf "result/seq*.h5" --metadata result/metadata.h5 --outdir result
 ```
 
-初回は各snapshotのmetadataだけを一度走査して `metadata.h5` を作ります。
-再実行時は未登録のsnapshotだけを追記します。XDMF生成はmanifestだけを読み、
-field本体やsnapshot HDF5を再走査しません。
-
-XDMFはmesh group名ごとに生成される。HDF5 groupを `/fluid` と
-`/soil_particles` にすると、`fluid.xdmf` と `soil_particles.xdmf` になる。
-field本体はXDMFへ複製されず、各 `seqNNNNNN.h5` のdatasetを参照する。
-
-粒子数が途中で0になる場合もHDF5には0件のdatasetをそのまま保存する。生成XDMFでは
-空stepを子GridのないSpatial Collectionとして表し、ゼロサイズdatasetを参照しない。
-非空stepでは通常のUniform GridがSpatial Collectionの子になる。全stepが非空のmesh
-は従来どおりUniform Gridの時系列として出力される。
-
-`metadata.h5` のmesh別時系列構造と増分更新の詳細は
+更新・再構築、空stepの扱いと運用上の注意は
 [POSTPROCESS.md](POSTPROCESS.md) を参照してください。
 
 ## 完成形のexample
@@ -211,6 +203,6 @@ example/serial-viz/generate.sh build
 ParaViewでの色付け、Glyph、粒子表示の手順もexample READMEに記載している。
 
 必要な実行時ツールはPython 3.10以上、`h5py`、`numpy`です。依存関係と固定版は
-`pyproject.toml` と `uv.lock` で管理されています。生成XDMFの確認にはParaView、
+h5xdmfの `pyproject.toml` と `uv.lock` で管理されています。生成XDMFの確認にはParaView、
 HDF5構造の手動確認には `h5dump` または `h5ls` が便利ですが、どちらも生成処理の
 必須依存ではありません。

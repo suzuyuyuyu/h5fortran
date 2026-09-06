@@ -1,4 +1,4 @@
-# ポストプロセス設計
+# ポストプロセス
 
 ## 方針
 
@@ -18,9 +18,7 @@ Fortran solver
               └── result/soil_particles.xdmf
 ```
 
-ソルバーは `metadata.h5` を更新しない。これにより、計算のcritical pathに中央HDF5の
-open、extent拡張、MPI同期を追加せず、snapshotとmanifestの二重書き込みによる
-不整合も避ける。
+ソルバーは `metadata.h5` を更新しない。
 
 ## ファイルの責務
 
@@ -29,14 +27,7 @@ open、extent拡張、MPI同期を追加せず、snapshotとmanifestの二重書
 Fortranソルバーが1 output stepにつき1ファイル出力する。field本体、geometry、
 connectivityと、そのファイルを解釈するためのmetadataを保持する。
 
-```text
-/                                      attrs: scheme_version, time
-/<mesh>/                               attrs: topology_type, nodes_per_element
-/<mesh>/geometry/nodes
-/<mesh>/geometry/connectivity          connectivity meshのみ
-/<mesh>/point_data/<field>
-/<mesh>/cell_data/<field>
-```
+保存レイアウトは共有仕様の[可視化レイアウト](https://github.com/suzuyuyuyu/h5c/blob/main/docs/FORMAT.md#可視化レイアウト)を参照する。
 
 ファイル名の数字部分の桁数は固定しない。ただしglobを辞書順に並べるため、同じrun内
 ではゼロ埋め桁数を統一する。標準例では6桁の `seqNNNNNN.h5` を使用する。
@@ -47,7 +38,7 @@ Pythonのindexerがsnapshot HDF5のshape、dtype、属性、pathだけを読み�
 ロードせずに作成する。削除または破損してもsnapshot HDF5から再構築できる。
 
 初回は指定されたsnapshotを走査する。再実行時は未登録のsnapshotだけを読み、
-Python側のUNLIMITED datasetへ追記する。同じ入力での再実行はno-opである。
+索引へ追記する。同じ入力での再実行はno-opである。
 
 時系列を通して固定するもの:
 
@@ -86,32 +77,8 @@ soil_particles.xdmf
 流体meshと土粒子をParaViewで個別に開くことができ、両方を読み込めば重ねて表示
 できる。
 
-## `metadata.h5` の構造
-
-MPIランクごとの出力範囲はFortran writerが1つのHDF5 datasetへ連結するため、
-manifestでは分割せず、root直下の各mesh groupを1つの論理meshとして扱う。
-
-```text
-/                                      attrs: scheme_version, format, mesh_order
-/timeseries/
-    time          (N,)                 snapshotの時刻
-    file          (N,)                 snapshotの相対パス
-/meshes/<mesh_name>/                   時系列で不変なmesh schema
-    geometry                           nodes/connectivityのdtype
-    fields/<field_name>                center、attribute_type、dtype
-    timeseries/
-        step_index (M,)                /timeseriesを参照するstep番号
-        num_nodes  (M,)                stepごとの節点数
-        num_elements (M,)              stepごとの要素数または粒子数
-```
-
-通常は `M == N` である。`step_index` を持つため、特定のmeshが存在しないstepも表現
-できる。scheme v1は同じmesh名の複数空間ブロックやAMRを扱わない。必要になった場合
-にHDF5 scheme version 2としてmetadata schemaを設計する。
-
-connectivityのMPI rank offsetはmetadataでは計算しない。Fortran writerが
-`MPI_Allgather` で各rankの節点数を集め、HDF5へ書く前にrank-local connectivityへ
-`offset_points` を加える。
+meshが存在しないstepも扱える。scheme v1は同じmesh名の複数空間ブロックやAMRを扱わない。
+粒子数は索引の `/meshes/<mesh_name>/timeseries/num_elements` で確認できる。
 
 ## 実行
 
@@ -127,31 +94,15 @@ h5xdmf "result/seq*.h5" --metadata result/metadata.h5 --outdir result
 snapshotのschemaだけを検査する場合は次を実行する。
 
 ```sh
-h5xdmf validate "result/seq*.h5"
+h5xdmf --check "result/seq*.h5"
 ```
 
 ## 完成形のexample
 
-[`example/visualization`](../example/visualization/) は2 MPI rank、5 output stepの
-snapshotを生成し、ポストプロセスまで一括実行する。
-
-```sh
-example/visualization/generate.sh build
-```
-
-生成結果:
-
-```text
-example/visualization/result/
-├── seq000000.h5
-├── seq000001.h5
-├── seq000002.h5
-├── seq000003.h5
-├── seq000004.h5
-├── metadata.h5
-├── fluid.xdmf
-└── soil_particles.xdmf
-```
+5 stepの流体・土粒子出力は[逐次例](../example/serial-viz/README.md)と
+[並列例](../example/parallel-viz/README.md)を参照する。
+各例の `result/` にsnapshot、`metadata.h5`、mesh別XDMFを生成する。
+並列例はクラスタのジョブスクリプトから実行する。
 
 ## 運用上の注意
 

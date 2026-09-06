@@ -25,13 +25,6 @@ MPI test は CMake が検出した `MPIEXEC_EXECUTABLE` と `MPIEXEC_NUMPROC_FLA
 
 Pythonポストプロセスの単体テストは独立した`h5xdmf`リポジトリで実行する。
 
-Fortranからポストプロセスまでの完成形は次で確認する。
-
-事前に`h5xdmf`をPATH上へインストールする。
-
-```sh
-example/visualization/generate.sh build
-```
-
-`example/visualization/result/` に5個のsnapshot HDF5、`metadata.h5`、
-`fluid.xdmf`、`soil_particles.xdmf` が生成される。
+可視化出力からポストプロセスまでの確認方法は
+[逐次例](../example/serial-viz/README.md)と[並列例](../example/parallel-viz/README.md)を参照する。
+クラスタではMPIを使うテスト・例をジョブスクリプトから実行し、ログインノードでは実行しない。

@@ -50,7 +50,7 @@ APIの詳細は [docs/USAGE.md](docs/USAGE.md) を参照してください。
 snapshot、manifest、XDMFの責務は
 [docs/POSTPROCESS.md](docs/POSTPROCESS.md) にまとめています。
 完成した出力構成を生成する例は
-[`example/visualization`](example/visualization/) にあります。
+[`example/serial-viz/`](example/serial-viz/)（逐次）と [`example/parallel-viz/`](example/parallel-viz/)（並列）にあります。
 
 ## fypp 生成
 

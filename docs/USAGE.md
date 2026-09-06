@@ -163,6 +163,6 @@ HDF5ライブラリ全体の `h5open_f` / `h5close_f` は別のライフサイ�
 
 詳細な型・rank とエラー契約は [SPEC.md](SPEC.md) を参照してください。
 
-可視化用のParallel HDF5 writerとPythonポストプロセスは
+可視化用のSerial / Parallel HDF5 writerとPythonポストプロセスは
 [USAGE-visualization.md](USAGE-visualization.md)、
 出力ファイルとmanifestの責務は [POSTPROCESS.md](POSTPROCESS.md) を参照してください。

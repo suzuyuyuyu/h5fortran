@@ -45,6 +45,9 @@ Serial の attribute は dataset、group、root group を対象にできる。�
 とする。既存の複数attribute書き込みAPI `h5fort_swrite_attr` は互換性のため維持する。
 dataset の `write(..., attrs=..., units=...)` は同じ文字列attribute実装へ委譲する。
 
+`logical` はfalseを0、trueを1として `integer(int32)` に変換して保存する。
+他言語との相互運用は共有仕様の[bool](https://github.com/suzuyuyuyu/h5c/blob/main/docs/FORMAT.md#データ型)を参照する。
+
 ## ファイル mode
 
 - `H5FORTRAN_FORCE_WRITE = 1`: ファイルを truncate create する。Serial dataset write の optional mode に指定した場合は既存 dataset を置換する。
@@ -76,14 +79,8 @@ rankと各次元長（`integer(int64), allocatable`）を返す。
 
 Parallel 配列は最終次元を MPI rank 間の分割方向とする。最終次元の長さは rank ごとに異なってよく、0 も許可する。それ以外の次元は全 rank で一致しなければならず、不一致は HDF5 collective call より前に拒否する。
 
-path `P` の保存形式は次のとおりである。
-
-- `P/data`: 最終次元方向へ連結したデータ
-- `P/__partition__`: rank境界を表す長さ `writer_nprocs + 1` のint64配列
-
-`partition(0) = 0`、rank `r` の開始位置は `partition(r)`、ローカル最終次元長は
-`partition(r+1) - partition(r)`、全体長は `partition(writer_nprocs)` とする。
-値は単調非減少であり、ローカル長0も表現できる。
+保存形式とrank境界は共有仕様の[Parallel の分割レイアウト](https://github.com/suzuyuyuyu/h5c/blob/main/docs/FORMAT.md#parallel-の分割レイアウト)を参照する。
+Fortranの最終次元は、ファイル上では第0次元に対応する。
 
 write時とread時の両方で、`data` の最終次元長が `__partition__` の最終値と一致する
 ことを検査する。read時はさらに先頭0、単調非減少、partition長と現在のMPI process数
@@ -98,36 +95,24 @@ write時とread時の両方で、`data` の最終次元長が `__partition__` �
 ローカル長0のrankはfile dataspaceを`h5sselect_none_f`、memory dataspaceを
 `H5S_NULL_F`で明示的に空選択する。
 
-## 生成物
-
-`src/fypp/` の `.fypp` を生成元とし、`src/serial/` と `src/parallel/` の型・rank 展開済みソースは直接編集しない。fypp 3.2 を使用し、`src/fypp/generate_fypp.sh --check` で同期を検証する。
-
 ## Visualization HDF5 writer
 
 `t_hdf5_writer` はローカルデータを逐次出力し、`t_phdf5_writer` は全rankのデータを
 集合的に出力する。Parallel APIを有効にしたビルドでは二つの型を同時に利用できる。
 どちらもXDMF/XMLを生成せず、同じ `scheme_version=1` のHDF5を出力する。
 
-共通の型・kind展開・dataset・mesh・属性処理は
-`src/fypp/serial/h5fort_serial_visualization.fypp` に集約する。
-parallel型はserial型を継承し、rankごとのoffsetとtotal、ファイルアクセスと
-転送property listだけを設定して共通の `initialize` を呼ぶ。
-serial側はparallel側に依存しない。一つのビルドでは全targetが同じHDF5を使う。
-parallel HDF5を使う構成では、`h5fortran_serial` 単独のリンクにもHDF5由来のMPI依存がある。
+一つのビルドでは全targetが同じHDF5を使う。parallel HDF5を使う構成では、
+serial targetにもHDF5由来のMPI依存がある。
 serialライブラリは常にビルドされ、serial APIと `t_hdf5_writer` は常に公開される。
 parallel APIと `t_phdf5_writer` は `H5FORTRAN_ENABLE_PARALLEL=ON` の場合に公開される（既定は `OFF`）。
-root属性は `scheme_version` と `time`、mesh group属性は `topology_type` と
-`nodes_per_element`、vector/tensor dataset属性は `attribute_type` とする。
+保存レイアウトは共有仕様の[可視化レイアウト](https://github.com/suzuyuyuyu/h5c/blob/main/docs/FORMAT.md#可視化レイアウト)を参照する。
 geometry は real32/real64/real128、connectivity は int8/int16/int32/int64、
 point/cell data はこれら7 kindの1D・2Dに対応する。
 
 `attribute_type=Tensor6`（成分数6）の成分順序はParaView/VTKの対称テンソル規約に合わせ、
 `XX, YY, ZZ, XY, YZ, XZ` とする。利用者はこの順序で第1次元を構成しなければならない。
-`h5xdmf`はテンソルデータを並べ替えず、`AttributeType="Tensor6"`を指定して保存済みの列を
-そのまま指す`DataItem`を生成するため、列0〜5の順序はそのままParaViewへ渡る。したがって
-ここで優先すべきなのはXDMF3仕様文の`XX, XY, XZ, YY, YZ, ZZ`ではなく、読み手である
-ParaView/VTKが期待する順序である。XDMF3仕様とは異なるが、パイプライン内で仕様順へ並べ替える
-処理はないため、この文書をXDMF3の順へ戻してはならない。
+`h5xdmf`は成分を並べ替えない。成分順の共通規約は
+[テンソル成分の順序](https://github.com/suzuyuyuyu/h5c/blob/main/docs/FORMAT.md#多成分フィールド)を参照する。
 
 connectivityを持つmeshは `mesh_name`、XDMFの `topology_type`、
 `nodes_per_element` を指定することで一般化する。既定値は
@@ -140,21 +125,5 @@ rank-local 0-origin IDとし、writerがrankごとのnode offsetを加えてHDF5
 変換する。connectivityのlocal IDが `[0, num_points)` の範囲外なら失敗する。
 ghost cellは重複cellになるため出力しない。
 
-XDMF3は独立ツール`h5xdmf`がHDF5 metadataを読み、ポストプロセスとして生成する。
-時系列中に空stepがあるmeshについては、XDMFの各stepをSpatial Collectionで包み、
-非空stepだけにUniform Gridを置く。空stepからゼロサイズHDF5 DataItemを参照しない。
-これはXDMF表現上の互換対策であり、HDF5 schemaや粒子数を変更しない。
-
-各snapshot内のdatasetは固定サイズとする。step間ではnode数、element数、粒子数が
-変化してよい。ソルバーは中央の `metadata.h5` へ追記せず、Python indexerが
-snapshot HDF5をmetadata-onlyで走査してmanifestを構築する。`metadata.h5` は
-snapshotから再構築可能な索引であり、Python側ではUNLIMITED datasetを使用して
-未登録stepを増分追記する。
-
-mesh名、topology、nodes per element、field構成、dtype、centeringは同じrunの
-時系列を通して固定する。time、node数、element数はstepごとに変化できる。
-MPI rankごとの範囲はHDF5内で連結済みの1つの論理meshとして扱い、
-`metadata.h5` では空間分割しない。同一mesh名の複数空間ブロックとAMRは
-scheme v1の対象外とする。
-
-詳細は [POSTPROCESS.md](POSTPROCESS.md) を参照する。
+XDMF3の生成、時系列の制約と空stepの扱いは
+[POSTPROCESS.md](POSTPROCESS.md) を参照する。
