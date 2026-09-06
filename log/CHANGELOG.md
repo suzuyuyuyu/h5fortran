@@ -1,12 +1,14 @@
 # 変更履歴
 
-## 1.1.1
+## v1.1.1
 
 - Serial APIを常時ビルド・公開するようにし、逐次APIの有効化オプションと条件付きマクロを削除した。
 - 可視化writerをserial型とそれを継承するparallel型に分離し、同一ビルドでの併用と共通レイアウトを検証するテストを追加した。
-- `Tensor6`の成分順序を訂正した。`SPEC.md`がXDMF3の`XX, XY, XZ, YY, YZ, ZZ`を記載していたが、h5xdmfは並べ替えず保存列をそのまま参照するため、ParaView/VTKが期待する`XX, YY, ZZ, XY, YZ, XZ`をh5fortranの文書に採用した。
+- `Tensor6`の成分順序の文書を、ParaView/VTKの`XX, YY, ZZ, XY, YZ, XZ`へ訂正した。
 - Serial公開属性genericへ4種の数値型のscalar・1D配列読み書きと要素数取得を追加した。
 - `h5xdmf`を独立リポジトリへ分離し、製品SemVerとHDF5 scheme versionを独立させた。
+- 可視化のexampleを`serial-viz/`と`parallel-viz/`に分離した。
+- `stdout/`と`stderr/`をリポジトリに残すようにした。従来はクローン直後にジョブが出力なしで即座に失敗していた。
 
 ## v1.1.0
 
@@ -24,4 +26,4 @@
 - 可視化用HDF5 writerとXDMF3生成ポストプロセスを追加した。
 - snapshot HDF5から再生成可能な`metadata.h5`を構築する設計を採用した。
 
-patch releaseの詳細は、同じディレクトリの日付・バージョン付きログを参照する。
+v1.0.1の検証経緯は [当時のログ](v1.md) を参照する。
