@@ -1,8 +1,12 @@
 これは、LLMエージェント用のマニュアルです。あなたはここに書いてある通りに出力を実装します。
-h5fortranは、hdf5ライターのFortran用ラッパーです。
-ここでhdf5を出力し、必要に応じてポストプロセスとしてh5xdmfによってParaViewなどで可視化します。
+h5fortranは、HDF5入出力のFortran用ラッパーです。
+可視化用HDF5を出力し、必要に応じてh5xdmfでXDMFに変換してParaViewなどで可視化します。
 
-コンパイルにおいては、INSTALL.llms.txtの手順でインストールされている場合、~/.local/opt/{intel,gnu}/ あるいはlog内に書かれた通りにビルド・インストールされているはずです。
-MakefileやCMakeLists.txtではこのインストールパスを用いてください。
-使用方法はexamples/にあります。moduleとしてuseし、構造体としてhdf5ファイルをインスタンス化して、writeで書き出すだけです。xdmfの出力はポストプロセスとして行います。
-XDMFの生成はh5xdmfで行います。これはh5xdmfのリポジトリのllms/内のドキュメントを参照してください。
+インストール済みのパスはINSTALL.llms.txtとlog/を確認し、不明ならユーザーに尋ねてください。
+CMakeではfind_package(h5fortran CONFIG REQUIRED)を使い、確認したインストール先をCMAKE_PREFIX_PATHに指定してください。
+公開ターゲットはh5fortran::h5fortran_serial、並列有効時のh5fortran::h5fortran_parallel、および包括ターゲットh5fortran::h5fortranです。
+逐次APIは常に利用でき、H5FORTRAN_ENABLE_PARALLEL=ONなら並列APIも同じビルドで利用できます。
+使用方法はexample/の実装を参照してください。use h5fortでAPIを取り込みます。
+可視化ライターは逐次用t_hdf5_writerと、MPIの集団I/Oを使う並列用t_phdf5_writerです。並列有効時は両方を利用できます。
+具体例はexample/serial-viz/とexample/parallel-viz/を参照してください。
+XDMFの生成はポストプロセスとしてh5xdmfで行います。h5xdmfリポジトリのinstructions/内の文書を参照してください。
