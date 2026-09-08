@@ -1,7 +1,7 @@
 これは、LLMエージェント用のインストールマニュアルです。あなたはここに書いてある指示に従ってh5fortranをインストールします。
 
 HDF5のFortran・HLライブラリとCMakeを必要とします。
-インストール先とコンパイラはユーザーに尋ね、~/.local/opt/{intel,gnu}/配下のバージョン付きディレクトリを提示してください。
+インストール先とコンパイラはユーザーに尋ねます。ただし、特にインストール先については指示がない限り${HOME}/.local/opt/<COMPILER:intel/gnu/nvhpc>/配下のバージョン付きディレクトリを使用してください。
 逐次APIは常にビルドされます。旧来の逐次APIを有効にするCMakeオプションは指定しないでください。
 H5FORTRAN_ENABLE_PARALLELの既定値はOFFです。ONにはParallel HDF5とMPIが必要です。並列化の要否はユーザーに確認してください。
 最後にh5xdmfのインストールを確認し、なければhttps://github.com/suzuyuyuyu/h5xdmf.gitを案内してください。
