@@ -197,7 +197,7 @@ example/serial-viz/generate.sh build
 ```
 
 複数rankから集合的に出力する場合は `example/parallel-viz/generate.sh build` を
-使います。クラスタではジョブスクリプトから実行し、ログインノードでは実行しません。
+使います。
 両例は同じmesh・field名で `result/seq000000.h5` 〜 `seq000004.h5` を生成します。
 生成されるファイルと使い方は各exampleのREADMEを参照してください。
 ParaViewでの色付け、Glyph、粒子表示の手順もexample READMEに記載している。
